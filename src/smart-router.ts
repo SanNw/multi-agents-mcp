@@ -1,7 +1,5 @@
-import { dirname, resolve } from "node:path";
-import { defaultAgentsPath, loadAgents } from "./agents.js";
+import { loadAgents, type Agent } from "./agents.js";
 
-export const technicalIds = ["naruto", "sasuke", "sakura"] as const;
 export type TaskSignals = {
   task: string; context?: string; agent?: string;
   kind?: "development" | "architecture" | "documentation" | "translation" | "philology";
@@ -10,18 +8,20 @@ export type TaskSignals = {
 };
 
 export async function loadConfiguredAgents() {
-  const original = process.env.AGENTS_CONFIG ?? defaultAgentsPath;
-  const technical = process.env.TECHNICAL_AGENTS_CONFIG ?? resolve(dirname(original), "technical-agents.yaml");
-  const agents = [...await loadAgents(original), ...await loadAgents(technical)];
+  const agents = await loadAgents();
+  if (process.env.TECHNICAL_AGENTS_CONFIG) agents.push(...await loadAgents(process.env.TECHNICAL_AGENTS_CONFIG));
   if (new Set(agents.map(a => a.id)).size !== agents.length) throw new Error("Identificadores de agentes duplicados");
   return agents;
 }
 
-export function classifyTask(input: TaskSignals, agentIds: string[] = [...technicalIds, "translator_a", "translator_b", "philologist", "translation_critic", "portuguese_editor"]) {
-  const prefix = input.task.match(/^\s*@(naruto|sasuke|sakura)\b\s*/i);
-  const explicit = input.agent?.toLowerCase();
+export function classifyTask(input: TaskSignals, agents: Pick<Agent, "id" | "role" | "task_kinds">[]) {
+  if (!agents.length) throw new Error("Nenhum agente configurado; configure AGENTS_CONFIG");
+  const agentIds = agents.map(agent => agent.id);
+  const prefix = input.task.match(/^\s*@([\w-]+)\b\s*/);
+  const explicit = input.agent;
+  if (prefix && !agentIds.includes(prefix[1]!)) throw new Error("Agente desconhecido");
   if (explicit && !agentIds.includes(explicit)) throw new Error("Agente desconhecido");
-  if (prefix && explicit && prefix[1]!.toLowerCase() !== explicit) throw new Error("Seleção manual conflitante");
+  if (prefix && explicit && prefix[1] !== explicit) throw new Error("Seleção manual conflitante");
   const task = prefix ? input.task.slice(prefix[0].length) : input.task;
   if (!task.trim()) throw new Error("Tarefa vazia");
   const manual = Boolean(explicit || prefix);
@@ -39,14 +39,19 @@ export function classifyTask(input: TaskSignals, agentIds: string[] = [...techni
   if (input.needs_tools && input.language) { score += 1; reasons.push("ferramentas e linguagem informadas"); }
   if (architecture) { score += 3; reasons.push("arquitetura ou integração crítica"); }
   const mixed = (translation || philology) && development;
-  const agent = explicit ?? prefix?.[1]?.toLowerCase() ?? (philology ? "philologist" : translation ? "translator_a" : score >= 3 ? "sasuke" : documentation ? "sakura" : "naruto");
+  const kind = input.kind ?? (philology ? "philology" : translation ? "translation" : score >= 3 ? "architecture" : documentation ? "documentation" : "development");
+  const roleKinds: Record<string, string> = { software_development: "development", architecture_and_review: "architecture", technical_assistance: "documentation", independent_translation: "translation", philological_analysis: "philology" };
+  const select = (kind: string) => agents.find(candidate => candidate.task_kinds?.includes(kind as NonNullable<TaskSignals["kind"]>) || roleKinds[candidate.role] === kind)?.id;
+  const agent = explicit ?? prefix?.[1] ?? select(kind) ?? agents[0]!.id;
+  const reviewer = select("architecture");
+  const developer = select("development");
   if (manual) reasons.unshift("seleção explícita do usuário");
   else reasons.unshift(philology || translation ? "fluxo editorial existente" : documentation && score < 3 ? "tarefa auxiliar" : "tipo e complexidade da tarefa");
   return {
     agent, task, manual, reasons, complexity_score: score,
     needs_clarification: mixed && !manual && !input.kind,
     classification: "deterministic" as const,
-    suggested_flow: manual || translation || philology || score < 3 ? [agent] : ["sasuke", "naruto", "sasuke"],
+    suggested_flow: manual || translation || philology || score < 3 || !reviewer || !developer ? [agent] : [reviewer, developer, reviewer],
     execution: "Codex aplica alterações e executa ferramentas; o MCP produz propostas e análises",
   };
 }

@@ -21,7 +21,7 @@ async function fixture(run: (manager: WorkflowManager, jobs: Map<string, Job>, d
   try { await run(manager, jobs, directory); }
   finally { await rm(directory, { recursive: true, force: true }); }
 }
-const input = { task: "Objetivo", steps: [{ agent: "philologist", task: "Analise", acceptance: "Evidência conferida" }] };
+const input = { task: "Objetivo", steps: [{ agent: "assistant", task: "Analise", acceptance: "Evidência conferida" }] };
 function complete(job: Job, content: string) { job.status = "success"; job.result = { content } as Job["result"]; }
 
 test("workflow exige revisão, preserva estado e não submete duas vezes", async () => fixture(async (manager, jobs) => {

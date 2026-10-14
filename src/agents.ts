@@ -5,6 +5,7 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 const agentSchema = z.object({
+  task_kinds: z.array(z.enum(["development", "architecture", "documentation", "translation", "philology"])).optional(),
   provider: z.string().regex(/^[a-z][a-z0-9_-]*$/).optional(),
   route: z.string().min(1),
   fallback_routes: z.array(z.string().min(1)).default([]),
@@ -27,7 +28,7 @@ const configSchema = z.object({
 
 export type Agent = z.infer<typeof agentSchema> & { id: string };
 
-export const defaultAgentsPath = fileURLToPath(new URL("../config/agents.yaml", import.meta.url));
+export const defaultAgentsPath = fileURLToPath(new URL("../config/agents.example.yaml", import.meta.url));
 
 export async function loadAgents(path = process.env.AGENTS_CONFIG ?? defaultAgentsPath) {
   const config = configSchema.parse(parse(await readFile(resolve(path), "utf8")));

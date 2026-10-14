@@ -25,7 +25,7 @@ test("pentest: real MCP rejects traversal and cannot execute model command propo
   const transport = new StdioClientTransport({ command: process.execPath, args: [resolve("dist/index.js")], env: {
     PATH: process.env.PATH ?? "/usr/bin:/bin", NODE_OPTIONS: "--max-old-space-size=256",
     MULTIAGENTS_BASE_URL: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`, MULTIAGENTS_API_KEY: "synthetic-not-a-real-key",
-    AGENTS_CONFIG: resolve("config/agents.yaml"), TECHNICAL_AGENTS_CONFIG: resolve("config/technical-agents.yaml"),
+    AGENTS_CONFIG: resolve("config/agents.example.yaml"), TECHNICAL_AGENTS_CONFIG: "",
     MULTIAGENTS_JOBS_DIR: join(directory, "jobs"), MULTIAGENTS_WORKFLOWS_DIR: join(directory, "workflows"),
   } });
   const call = (name: string, args: Record<string, unknown>) => client.callTool({ name, arguments: args });
@@ -36,7 +36,7 @@ test("pentest: real MCP rejects traversal and cannot execute model command propo
       assert.equal((await call(name, args)).isError, true);
     }
     assert.equal((await call("health_check", { provider: "unknown-profile" })).isError, true);
-    const result = await call("create_workflow", { task: "synthetic security probe", steps: [{ agent: "sakura", task: "propose a command", acceptance: "review only" }] });
+    const result = await call("create_workflow", { task: "synthetic security probe", steps: [{ agent: "assistant", task: "propose a command", acceptance: "review only" }] });
     assert(!result.isError);
     let workflow = (result.structuredContent as { workflow: Workflow }).workflow;
     const deadline = Date.now() + 15000;

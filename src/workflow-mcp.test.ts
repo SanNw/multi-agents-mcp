@@ -31,7 +31,7 @@ test("MCP real: workflow ligado a jobs, aprovacao, resultado e contexto entre et
     ...process.env as Record<string, string>, NINEROUTER_URL: `http://127.0.0.1:${port}`, NINEROUTER_KEY: "fixture",
     MULTIAGENTS_BASE_URL: `http://127.0.0.1:${port}`, MULTIAGENTS_API_KEY: "fixture",
     MULTIAGENTS_PROVIDERS_CONFIG: providersPath, OMNIROUTE_API_KEY: "fixture",
-    AGENTS_CONFIG: resolve("config/agents.yaml"), TECHNICAL_AGENTS_CONFIG: resolve("config/technical-agents.yaml"),
+    AGENTS_CONFIG: resolve("config/agents.example.yaml"), TECHNICAL_AGENTS_CONFIG: "",
     NINEROUTER_JOBS_DIR: join(directory, "jobs"), NINEROUTER_WORKFLOWS_DIR: join(directory, "workflows"),
     MULTIAGENTS_JOBS_DIR: join(directory, "jobs"), MULTIAGENTS_WORKFLOWS_DIR: join(directory, "workflows"),
   } });
@@ -52,8 +52,8 @@ test("MCP real: workflow ligado a jobs, aprovacao, resultado e contexto entre et
     await client.connect(transport);
     assert.equal((await client.listTools()).tools.length, 18);
     const created = (await call("create_workflow", { task: "Teste de protocolo", steps: [
-      { agent: "sakura", task: "Prepare", acceptance: "Resultado validado" },
-      { agent: "sakura", task: "Revise", acceptance: "Evidencias preservadas" },
+      { agent: "assistant", task: "Prepare", acceptance: "Resultado validado" },
+      { agent: "assistant", task: "Revise", acceptance: "Evidencias preservadas" },
     ] })).workflow;
     const first = await collect(created.id); assert.equal(first.status, "awaiting_actions");
     const action = first.steps[0]!.actions[0]!;

@@ -5,9 +5,9 @@ Envie a create_workflow um plano explicito:
 ```json
 {"task":"Corrigir uma API preservando o contrato","context":"Trechos reais",
  "steps":[
-  {"agent":"sasuke","task":"Analise a causa","acceptance":"Hipotese sustentada por codigo"},
-  {"agent":"naruto","task":"Proponha patch e teste","acceptance":"Codex aplicou e testou a correcao"},
-  {"agent":"sasuke","task":"Revise as evidencias","acceptance":"Riscos criticos resolvidos ou registrados"}
+  {"agent":"reviewer","task":"Analise a causa","acceptance":"Hipotese sustentada por codigo"},
+  {"agent":"developer","task":"Proponha patch e teste","acceptance":"Codex aplicou e testou a correcao"},
+  {"agent":"reviewer","task":"Revise as evidencias","acceptance":"Riscos criticos resolvidos ou registrados"}
  ]}
 ```
 

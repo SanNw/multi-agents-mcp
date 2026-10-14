@@ -1,0 +1,19 @@
+agents:
+  developer:
+    route: your-model-id
+    role: software_development
+    task_kinds: [development]
+    description: Proposes code and tests from the context provided by the client.
+    route_strategy: fallback
+  reviewer:
+    route: your-model-id
+    role: architecture_and_review
+    task_kinds: [architecture]
+    description: Reviews architecture, evidence, and implementation risks.
+    route_strategy: fallback
+  assistant:
+    route: your-model-id
+    role: technical_assistance
+    task_kinds: [documentation]
+    description: Prepares documentation and explanations from the supplied context.
+    route_strategy: fallback

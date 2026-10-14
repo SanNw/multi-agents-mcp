@@ -1,4 +1,8 @@
 .env
+config/agents.yaml
+config/technical-agents.yaml
+config/chunk-11-philology-job.json
+docs/model-selection.md
 node_modules/
 dist/
 work/

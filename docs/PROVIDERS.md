@@ -26,7 +26,7 @@ Em seu arquivo de agentes, selecione um perfil por agente:
 
 ```yaml
 agents:
-  naruto:
+  developer:
     provider: omniroute
     route: auto/coding
     role: software_development

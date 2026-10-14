@@ -19,7 +19,7 @@ test("security: traversal and private-file proposals are rejected", () => {
 });
 
 test("security: workflow budgets and extra approval fields cannot be injected", () => {
-  const step = { agent: "sakura", task: "review", acceptance: "evidence" };
+  const step = { agent: "assistant", task: "review", acceptance: "evidence" };
   for (const input of [{ task: "x", steps: Array(9).fill(step) }, { task: "x", steps: [step], timeout_ms: 180001 },
     { task: "x", steps: [step], max_output_tokens: 4001 }, { task: "x", steps: [step], approved: true }]) {
     assert.equal(workflowInputSchema.safeParse(input).success, false);
@@ -52,7 +52,7 @@ test("npm: default agents resolve independently of caller directory", async () =
   try {
     delete process.env.AGENTS_CONFIG; delete process.env.TECHNICAL_AGENTS_CONFIG;
     process.chdir(root);
-    assert.equal((await loadConfiguredAgents()).length, 8);
+    assert.equal((await loadConfiguredAgents()).length, 3);
   } finally {
     process.chdir(cwd);
     if (original === undefined) delete process.env.AGENTS_CONFIG; else process.env.AGENTS_CONFIG = original;

@@ -9,7 +9,7 @@ import { ProviderRegistry } from "./providers.js";
 import { classifyTask, loadConfiguredAgents, prioritizeRoutes } from "./smart-router.js";
 import { WorkflowManager, workflowInputSchema } from "./workflows.js";
 
-const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.4.1" });
+const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.4.2" });
 const client = await ProviderRegistry.load();
 const jobs = new JobManager(client);
 await jobs.init();
@@ -162,21 +162,20 @@ server.registerTool("route_task", {
   inputSchema: routingInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
 }, async input => {
-  try { return result(classifyTask(input, (await loadConfiguredAgents()).map(agent => agent.id))); } catch (error) { return failure(error); }
+  try { return result(classifyTask(input, await loadConfiguredAgents())); } catch (error) { return failure(error); }
 });
 
 server.registerTool("submit_routed_task", {
-  description: "Roteia e enfileira uma análise/proposta, preservando estado estruturado. @naruto, @sasuke ou @sakura no início selecionam manualmente. O Codex executa arquivos e comandos; o MCP não os executa.",
+  description: "Roteia e enfileira uma análise/proposta, preservando estado estruturado. @id no início seleciona um agente configurado. O cliente executa arquivos e comandos; o MCP não os executa.",
   inputSchema: { ...routingInput, state: taskState.optional(), max_output_tokens: z.number().int().min(1).max(12000).default(4000), timeout_ms: z.number().int().min(1000).max(600000).default(120000) },
   annotations: { readOnlyHint: false, openWorldHint: true },
 }, async input => {
   try {
     const configured = await loadConfiguredAgents();
-    const routing = classifyTask(input, configured.map(agent => agent.id));
+    const routing = classifyTask(input, configured);
     if (routing.needs_clarification) throw new Error("Tarefa mista: informe kind ou selecione um agente explicitamente");
     const agent = findAgent(configured, routing.agent);
-    // Technical fallbacks must be advertised; legacy editorial policies stay untouched.
-    if (["naruto", "sasuke", "sakura"].includes(agent.id)) {
+    if (agent.route_strategy === "fallback") {
       const available = new Set((await client.models(agent.provider)).map(model => model.id));
       let routes = [agent.route, ...agent.fallback_routes].filter(route => available.has(route));
       if (!routes.length) throw new Error("Nenhuma rota configurada do agente está disponível no catálogo");
