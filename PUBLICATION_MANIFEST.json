@@ -1,14 +1,14 @@
 {
   "name": "MULTIAGENTS-MCP",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "files": [
     {
       "path": "package.json",
-      "sha256": "7ed8fd3047804ddbf6190cff9b4c99af7a034e03537184a15e4fc158cdaab4b2"
+      "sha256": "597491e643ba45927d8a7597a6f9df7628fbd716f7a2e8d241f7d82806ec206c"
     },
     {
       "path": "package-lock.json",
-      "sha256": "0c9f03a421c2ed65cf1031090c9d19c3052f497a3ceaef7a02659a778f2b8e7b"
+      "sha256": "87dbcb9e43d3ab6731b7e796ba1b45480d1bd6b042778b96958e1c5ea6fe87da"
     },
     {
       "path": "tsconfig.json",
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "809bd3df0a129852faa1c555a98a4f60f448fd15fd918711de7353106baaf254"
+      "sha256": "c365e6ff482c5180cecce6fc3c64a73baecb2539c24514bfbae523f141410a19"
     },
     {
       "path": "LICENSE",
@@ -43,16 +43,24 @@
       "sha256": "b4eaf8691755cb2621f1022cdbbbe2b030df243fe703862186283d1d6bc46436"
     },
     {
+      "path": "docs/SECURITY_ASSESSMENT.md",
+      "sha256": "8030a7a20ba532405f11c112cfbd2f3b0ad72e7e0852dc859584e83097137853"
+    },
+    {
       "path": ".github/workflows/ci.yml",
-      "sha256": "4dd9e63e1f3835c48703630c5a9afe5043396835dcbe66254e36fb1e0184a4d7"
+      "sha256": "b77606f2d4cc2bd8b7cab1c70297ad37b0958ea12831114a3954bbb8492e4063"
     },
     {
       "path": "scripts/prepare-release.mjs",
-      "sha256": "217d4c4adcf271fafd61d84f596104381e8fa5e9a2f9f7b12d22ce7628d23ffa"
+      "sha256": "63c8d790321c03aa3ee2d06a27349bbd0570aa3f9b3bb7129b8016fac0132dc7"
     },
     {
       "path": "scripts/prepare-release.test.mjs",
-      "sha256": "70546bed170427dc1c46e1ec035b802b0aa58bcc58653e65028d2b23a6374f91"
+      "sha256": "6b87276196e4289cbc38bf49b5f1de868756c0c2ba80c09c757933626693fcbe"
+    },
+    {
+      "path": "scripts/package.test.mjs",
+      "sha256": "554d86bcccea9b5f5003aa72ef0d5eeba21b41d0a515d4cd3a9d5dcc995b6631"
     },
     {
       "path": "src/agents.test.ts",
@@ -60,7 +68,7 @@
     },
     {
       "path": "src/agents.ts",
-      "sha256": "dd278069164454d2c39653e7b917d83a0233832dc23cac9d20aebec8558c2153"
+      "sha256": "18ebeb76d76a79df02e67c1132393e0598380b4a73cdb34df941149f8a423395"
     },
     {
       "path": "src/errors.ts",
@@ -68,7 +76,7 @@
     },
     {
       "path": "src/index.ts",
-      "sha256": "7e37fd95efc554a7fd8562ca40cee4f67c2e31a68044d72b57016aa930c7ec26"
+      "sha256": "c3bc41ac06f874fdae852ea77a36ec53cab13e3d42692a432dbfeb809d3b2f75"
     },
     {
       "path": "src/jobs.test.ts",
@@ -76,7 +84,7 @@
     },
     {
       "path": "src/jobs.ts",
-      "sha256": "5c96caa2e824b909d52859558115659061e72409dbce3a967517b6b80a9203b6"
+      "sha256": "bb2216840247f7ef50c9137a8cffb80535c452c1e37a5eb6dfdd5b3e1c0d746e"
     },
     {
       "path": "src/providers.test.ts",
@@ -95,12 +103,20 @@
       "sha256": "911ea0637edb9f357b6087e9fd8cd7936b8e16798fa56ddbd9ac5f044cd1eb83"
     },
     {
+      "path": "src/security-mcp.test.ts",
+      "sha256": "28df0329f825b6fcfd4d7fd249f42cf340d61ecc138f3f8dc59fdb87e08e37eb"
+    },
+    {
+      "path": "src/security.test.ts",
+      "sha256": "a65cfc52a9d0394d6c0d2529e3113bc4dca0f10fde81ce63b7e15a6051d76b54"
+    },
+    {
       "path": "src/smart-router.test.ts",
       "sha256": "c042445c12a78655e2b858c7f2308f8ab88b0e4d0959def3f57e7b2432632f0e"
     },
     {
       "path": "src/smart-router.ts",
-      "sha256": "2f4d5cc64f577004fbc31b8b96cd6d7b0b67b834009eae56aaccd7fb1c69f0c7"
+      "sha256": "1b37683121e23eb29c00d4f1561f1c0ce8fb968ab90b7f985ec96315b0add8a7"
     },
     {
       "path": "src/workflow-mcp.test.ts",

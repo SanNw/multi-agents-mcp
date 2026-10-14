@@ -1,5 +1,5 @@
 import { dirname, resolve } from "node:path";
-import { loadAgents } from "./agents.js";
+import { defaultAgentsPath, loadAgents } from "./agents.js";
 
 export const technicalIds = ["naruto", "sasuke", "sakura"] as const;
 export type TaskSignals = {
@@ -10,7 +10,7 @@ export type TaskSignals = {
 };
 
 export async function loadConfiguredAgents() {
-  const original = process.env.AGENTS_CONFIG ?? "./config/agents.yaml";
+  const original = process.env.AGENTS_CONFIG ?? defaultAgentsPath;
   const technical = process.env.TECHNICAL_AGENTS_CONFIG ?? resolve(dirname(original), "technical-agents.yaml");
   const agents = [...await loadAgents(original), ...await loadAgents(technical)];
   if (new Set(agents.map(a => a.id)).size !== agents.length) throw new Error("Identificadores de agentes duplicados");

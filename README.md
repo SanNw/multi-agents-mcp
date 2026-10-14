@@ -131,7 +131,9 @@ npm test
 npm run release:prepare
 ```
 
-Release preparation copies only allowlisted public files into `release/`, creates a SHA-256 manifest, and checks defensively for secrets/personal paths. It excludes Git metadata, jobs, workflows, outputs, and global configurations. Review the result: these checks are not a complete security audit. `private: true` prevents accidental npm publication, not GitHub publication.
+Release preparation copies only allowlisted public files into `release/`, creates a SHA-256 manifest, and checks defensively for secrets/personal paths. It excludes Git metadata, jobs, workflows, outputs, and global configurations. Review the result: these checks are not a complete security audit. The npm package uses a separate `files` allowlist for compiled runtime, example configuration, and documentation.
+
+For npm installations, use `npm install -g multiagents-mcp` and configure your MCP client to run `multiagents-mcp`, or use `npx --yes multiagents-mcp@0.4.1`. The package includes compiled JavaScript; consumers do not need TypeScript or a build. Provide backend credentials through the process environment. Default agent files resolve inside the installed package; set absolute private job/workflow directories to avoid storing state in the caller's working directory.
 
 Licensed under [MIT](LICENSE). Conceptually inspired by [ManusMCP](https://github.com/mantrakp04/manusmcp); no executor, framework, or dependency from that stack was incorporated.
 
@@ -305,8 +307,16 @@ O ultimo comando cria um checkout em release/ por lista explicita, com
 manifesto SHA-256 e verificacao defensiva de segredos/caminhos pessoais.
 Nao copia .git, historicos, jobs, workflows, outputs ou configuracoes globais.
 Revise antes de publicar. A verificacao nao e auditoria completa de seguranca.
-private=true impede npm publish acidental; nao impede publicar no GitHub.
+O pacote npm usa uma allowlist separada em files para runtime compilado,
+configuracoes de exemplo e documentacao.
 A CI usa testes sem credenciais ou inferencias externas.
+
+Para instalar pelo npm, use `npm install -g multiagents-mcp` e configure o cliente
+MCP para executar `multiagents-mcp`, ou use `npx --yes multiagents-mcp@0.4.1`.
+O pacote inclui JavaScript compilado: o consumidor nao precisa compilar nem
+instalar TypeScript. Forneca credenciais no ambiente do processo. Os agentes
+padrao sao carregados da instalacao; configure caminhos privados absolutos para
+jobs/workflows, evitando gravar estado na pasta de onde o comando foi chamado.
 
 Licenca MIT. Inspiracao conceitual: [ManusMCP](https://github.com/mantrakp04/manusmcp).
 Nenhum executor, framework ou dependencia de sua stack foi incorporado.

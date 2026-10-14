@@ -9,8 +9,9 @@ test("exporta somente allowlist, bloqueia segredos e nao sobrescreve staging", a
   const temporary = await mkdtemp(join(tmpdir(), "router-release-")); const root = join(temporary, "source");
   try {
     const files = ["package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".env.example", "README.md", "LICENSE", "SECURITY.md",
-      "docs/WORKFLOWS.md", "docs/PROVIDERS.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "src/example.ts", "config/agents.yaml", "config/technical-agents.yaml", "config/providers.example.yaml", ".env", ".jobs/private.json"];
+      "docs/WORKFLOWS.md", "docs/PROVIDERS.md", "docs/SECURITY_ASSESSMENT.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "scripts/package.test.mjs", "src/example.ts", "config/agents.yaml", "config/technical-agents.yaml", "config/providers.example.yaml", ".env", ".jobs/private.json"];
     for (const file of files) { await mkdir(dirname(join(root, file)), { recursive: true }); await writeFile(join(root, file), "fixture"); }
+    await writeFile(join(root, "package.json"), JSON.stringify({ version: "0.4.1" }));
     const destination = join(temporary, "public");
     const manifest = await prepareRelease(root, destination);
     assert.ok(manifest.some(file => file.path === "src/example.ts"));

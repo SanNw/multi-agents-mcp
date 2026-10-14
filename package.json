@@ -1,7 +1,13 @@
 {
   "name": "multiagents-mcp",
-  "version": "0.4.0",
-  "private": true,
+  "version": "0.4.1",
+  "description": "Specialized AI delegation and reviewed persistent workflows over MCP stdio",
+  "bin": { "multiagents-mcp": "dist/index.js" },
+  "files": ["dist/*.js", "!dist/*.test.js", "config/*.yaml", "docs", "README.md", "SECURITY.md", "LICENSE"],
+  "repository": { "type": "git", "url": "git+https://github.com/SanNw/multi-agents-mcp.git" },
+  "homepage": "https://github.com/SanNw/multi-agents-mcp#readme",
+  "bugs": { "url": "https://github.com/SanNw/multi-agents-mcp/issues" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "license": "MIT",
   "engines": {
     "node": ">=20.11"

@@ -9,7 +9,7 @@ import { ProviderRegistry } from "./providers.js";
 import { classifyTask, loadConfiguredAgents, prioritizeRoutes } from "./smart-router.js";
 import { WorkflowManager, workflowInputSchema } from "./workflows.js";
 
-const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.4.0" });
+const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.4.1" });
 const client = await ProviderRegistry.load();
 const jobs = new JobManager(client);
 await jobs.init();

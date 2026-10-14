@@ -7,7 +7,7 @@ export async function prepareRelease(root, destination) {
   const sourceRoot = await realpath(root);
   // Publication is allowlisted; private runtime files never enter staging.
   const files = ["package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".env.example", "README.md", "LICENSE", "SECURITY.md",
-    "docs/WORKFLOWS.md", "docs/PROVIDERS.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs",
+    "docs/WORKFLOWS.md", "docs/PROVIDERS.md", "docs/SECURITY_ASSESSMENT.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "scripts/package.test.mjs",
     ...(await readdir(resolve(root, "src"))).filter(name => name.endsWith(".ts")).map(name => `src/${name}`),
     "config/agents.yaml", "config/technical-agents.yaml", "config/providers.example.yaml"];
   const manifest = []; const staged = [];
@@ -25,7 +25,8 @@ export async function prepareRelease(root, destination) {
   for (const { name, bytes } of staged) {
     const target = resolve(destination, name); await mkdir(dirname(target), { recursive: true }); await writeFile(target, bytes);
   }
-  await writeFile(resolve(destination, "PUBLICATION_MANIFEST.json"), JSON.stringify({ name: "MULTIAGENTS-MCP", version: "0.4.0", files: manifest }, null, 2) + "\n");
+  const version = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")).version;
+  await writeFile(resolve(destination, "PUBLICATION_MANIFEST.json"), JSON.stringify({ name: "MULTIAGENTS-MCP", version, files: manifest }, null, 2) + "\n");
   return manifest;
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

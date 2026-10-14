@@ -41,7 +41,7 @@ export class JobManager {
   constructor(private readonly runner: Runner, private readonly directory = process.env.MULTIAGENTS_JOBS_DIR ?? process.env.NINEROUTER_JOBS_DIR ?? "./.jobs") {}
 
   async init() {
-    await mkdir(resolve(this.directory), { recursive: true });
+    await mkdir(resolve(this.directory), { recursive: true, mode: 0o700 });
     for (const name of await readdir(resolve(this.directory))) {
       if (!name.endsWith(".json")) continue;
       try {
@@ -124,6 +124,7 @@ export class JobManager {
 
   private async run(job: Job) {
     const controller = new AbortController();
+    let finalStatus: Job["status"] = "error";
     this.controllers.set(job.id, controller);
     job.status = "running";
     job.updated_at = new Date().toISOString();
@@ -147,19 +148,21 @@ export class JobManager {
         },
       );
       if (!job.partial_content) job.partial_content = job.result.content;
-      job.status = controller.signal.aborted ? "cancelled" : job.result.status;
+      finalStatus = controller.signal.aborted ? "cancelled" : job.result.status;
     } catch (error) {
       if (controller.signal.aborted) {
-        job.status = "cancelled";
+        finalStatus = "cancelled";
       } else {
-        job.status = "error";
+        finalStatus = "error";
         job.error = serializeError(error);
       }
     } finally {
+      // Publish terminal status only after its result is durable on disk.
+      const completed = { ...job, status: finalStatus, updated_at: new Date().toISOString() };
+      await this.persist(completed);
+      Object.assign(job, completed);
       this.controllers.delete(job.id);
       this.checkpointAt.delete(job.id);
-      job.updated_at = new Date().toISOString();
-      await this.persist(job);
     }
   }
 

@@ -20,3 +20,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run release:prepare
+      - run: npm pack --ignore-scripts
+        if: matrix.node == 24
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.node == 24
+        with:
+          name: npm-package
+          path: multiagents-mcp-*.tgz
+          if-no-files-found: error

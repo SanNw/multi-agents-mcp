@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -26,7 +27,9 @@ const configSchema = z.object({
 
 export type Agent = z.infer<typeof agentSchema> & { id: string };
 
-export async function loadAgents(path = process.env.AGENTS_CONFIG ?? "./config/agents.yaml") {
+export const defaultAgentsPath = fileURLToPath(new URL("../config/agents.yaml", import.meta.url));
+
+export async function loadAgents(path = process.env.AGENTS_CONFIG ?? defaultAgentsPath) {
   const config = configSchema.parse(parse(await readFile(resolve(path), "utf8")));
   return Object.entries(config.agents).map(([id, agent]) => ({ id, ...agent }));
 }
