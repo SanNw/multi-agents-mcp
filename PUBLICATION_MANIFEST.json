@@ -1,0 +1,130 @@
+{
+  "name": "MULTIAGENTS-MCP",
+  "version": "0.4.0",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "7ed8fd3047804ddbf6190cff9b4c99af7a034e03537184a15e4fc158cdaab4b2"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "0c9f03a421c2ed65cf1031090c9d19c3052f497a3ceaef7a02659a778f2b8e7b"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "f05fbb2e07abfd4b4aa632bc4e9652d4213327e9264a08924581dbf0a83512b6"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "6d8b3d5999ea4bd920380db15125a250b3cff2067c8276467062c02f8f68e3ea"
+    },
+    {
+      "path": ".env.example",
+      "sha256": "b3ec308402587ac1d7e8fc1b99f846265d886b87a7a96187372f5ef47708423d"
+    },
+    {
+      "path": "README.md",
+      "sha256": "43e8805698ce6b1df6f7dc59ba13b685cf46769abe63aeb47c5a1be37f1369c3"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "1a8e1c1298c8e892f05b60a47ebb61e72b3dd2de09687eb771eb43f607fe7b64"
+    },
+    {
+      "path": "SECURITY.md",
+      "sha256": "78d7cfe183344e1e1dbc4e5253c181c77acbf6a216350ab9fc25a57742e71f3d"
+    },
+    {
+      "path": "docs/WORKFLOWS.md",
+      "sha256": "b80fadc7816c70f0204191c1df83a6a259f4ad75a08c2f29fc2ee076a2ae6221"
+    },
+    {
+      "path": "docs/PROVIDERS.md",
+      "sha256": "b4eaf8691755cb2621f1022cdbbbe2b030df243fe703862186283d1d6bc46436"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "4dd9e63e1f3835c48703630c5a9afe5043396835dcbe66254e36fb1e0184a4d7"
+    },
+    {
+      "path": "scripts/prepare-release.mjs",
+      "sha256": "217d4c4adcf271fafd61d84f596104381e8fa5e9a2f9f7b12d22ce7628d23ffa"
+    },
+    {
+      "path": "scripts/prepare-release.test.mjs",
+      "sha256": "70546bed170427dc1c46e1ec035b802b0aa58bcc58653e65028d2b23a6374f91"
+    },
+    {
+      "path": "src/agents.test.ts",
+      "sha256": "a7b11d04c2fd5a1d9b299b37cd3f9777f4f5cc75b48dd13a577d2f0ac1e6de89"
+    },
+    {
+      "path": "src/agents.ts",
+      "sha256": "dd278069164454d2c39653e7b917d83a0233832dc23cac9d20aebec8558c2153"
+    },
+    {
+      "path": "src/errors.ts",
+      "sha256": "c4cb0baace2744e20c0c5cd013d5fb1a8bf83035c78e9f64a6893474f4c1aab7"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "7e37fd95efc554a7fd8562ca40cee4f67c2e31a68044d72b57016aa930c7ec26"
+    },
+    {
+      "path": "src/jobs.test.ts",
+      "sha256": "a032482d831539c967965000b26f8280e0df480db6371e00e8231a6401a87cda"
+    },
+    {
+      "path": "src/jobs.ts",
+      "sha256": "5c96caa2e824b909d52859558115659061e72409dbce3a967517b6b80a9203b6"
+    },
+    {
+      "path": "src/providers.test.ts",
+      "sha256": "574fcbd1dc5c7fe234d5e692fbf8eee118832c113bc83c80a148cf99bfab4fd3"
+    },
+    {
+      "path": "src/providers.ts",
+      "sha256": "cd1218616017c4a63efd3d90231044dd94c63f38dd1866d201aeabe96ec2b33c"
+    },
+    {
+      "path": "src/router-client.test.ts",
+      "sha256": "64691d271d701af75e3ef4bc3bfa39e7f5a24fb44981b0f0fbecdeb024052350"
+    },
+    {
+      "path": "src/router-client.ts",
+      "sha256": "911ea0637edb9f357b6087e9fd8cd7936b8e16798fa56ddbd9ac5f044cd1eb83"
+    },
+    {
+      "path": "src/smart-router.test.ts",
+      "sha256": "c042445c12a78655e2b858c7f2308f8ab88b0e4d0959def3f57e7b2432632f0e"
+    },
+    {
+      "path": "src/smart-router.ts",
+      "sha256": "2f4d5cc64f577004fbc31b8b96cd6d7b0b67b834009eae56aaccd7fb1c69f0c7"
+    },
+    {
+      "path": "src/workflow-mcp.test.ts",
+      "sha256": "ab48cd54ce2ebf57609fd815ad80d298ec2535b730acf8378bd8fb3c3b7de38d"
+    },
+    {
+      "path": "src/workflows.test.ts",
+      "sha256": "e2215572436a0738ac12ccb759806888230a7de74bceb92b5c94ff76ff31488d"
+    },
+    {
+      "path": "src/workflows.ts",
+      "sha256": "39fdb6908bd4cdad6326b87e85d45c9efa473c598e01010a8254b692e73c50cf"
+    },
+    {
+      "path": "config/agents.yaml",
+      "sha256": "22684e4b041e4ca80bace2c49631398a82506b0b049f3b682615d1bc3b73bc19"
+    },
+    {
+      "path": "config/technical-agents.yaml",
+      "sha256": "0d635d39a5febf1a3db19928590f097a1a0d11806020d074367cea70d4a2b93d"
+    },
+    {
+      "path": "config/providers.example.yaml",
+      "sha256": "805cee8e55e90201ee7bb39321dce114b46f550060b7e0a6f99f8c5330b50e8c"
+    }
+  ]
+}

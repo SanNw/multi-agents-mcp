@@ -1,0 +1,13 @@
+.env
+node_modules/
+dist/
+work/
+*.log
+.jobs/
+outputs/
+.workflows/
+release/
+**/graphify-out/
+SMART_ROUTER.md
+docs/MCP_ISSUES_LOG.md
+docs/RELATORIO_PROBLEMAS_MCP_2026-09-24.md

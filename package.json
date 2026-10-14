@@ -1,0 +1,27 @@
+{
+  "name": "multiagents-mcp",
+  "version": "0.4.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "type": "module",
+  "scripts": {
+    "pretest": "npm run build",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "node --test --import tsx src/*.test.ts scripts/*.test.mjs",
+    "release:prepare": "node scripts/prepare-release.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.33",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

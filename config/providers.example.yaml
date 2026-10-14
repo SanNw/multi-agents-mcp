@@ -1,0 +1,20 @@
+# Copie para um arquivo privado e habilite MULTIAGENTS_PROVIDERS_CONFIG.
+# Credenciais ficam somente nas variaveis de ambiente referenciadas.
+providers:
+  default:
+    base_url: http://127.0.0.1:20128/v1
+    api_key_env: NINEROUTER_KEY
+    protocol: openai-chat-completions
+    streaming: true
+  omniroute:
+    base_url: http://127.0.0.1:20129/v1
+    api_key_env: OMNIROUTE_API_KEY
+    protocol: openai-chat-completions
+    streaming: true
+  custom:
+    base_url: https://api.example.com/v1
+    api_key_env: CUSTOM_API_KEY
+    protocol: openai-chat-completions
+    streaming: false
+    # Catalogo declarado para endpoints sem /models; nao comprova inferencia.
+    models: [my-combo]
