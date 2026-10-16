@@ -13,7 +13,16 @@ workspace, symlinks, caminhos, patches e comandos antes de qualquer execucao.
 Resultados registrados sao declaracoes do cliente, nao atestados independentes.
 Confirme arquivos e resultados reais antes de aceitar etapas ou repetir efeitos.
 
-Nao publique .env, .jobs, .workflows, outputs, backups, logs ou historicos.
+Gestao de combos exige credencial administrativa e politica privadas explicitas.
+Somente novas versoes sao criadas; nenhum combo existente e sobrescrito ou
+apagado. Referencias em outras CLIs sao descobertas apenas em JSONs declarados;
+consumidores desconhecidos podem existir. Testes de modelos consomem cota e nao
+comprovam qualidade geral. Redirecionamentos administrativos sao bloqueados.
+Estado de propriedade e recuperacao fica em .combos com permissoes 0600/0700;
+preserve-o. Locks sobreviventes exigem verificacao dos consumidores antes de
+qualquer remocao. Nao reutilize automaticamente credenciais de inferencia.
+
+Nao publique .env, .jobs, .workflows, .combos, outputs, backups, logs ou historicos.
 O exportador usa allowlist e verificacao defensiva; nao detecta todo segredo
 nem substitui revisao humana. Nao reporte credenciais em issues publicas.
 Use o canal privado de seguranca do repositorio quando configurado; ate la,

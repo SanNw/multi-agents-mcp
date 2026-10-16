@@ -50,7 +50,9 @@ test("MCP real: workflow ligado a jobs, aprovacao, resultado e contexto entre et
   }
   try {
     await client.connect(transport);
-    assert.equal((await client.listTools()).tools.length, 18);
+    const tools = (await client.listTools()).tools;
+    assert.equal(tools.length, 23);
+    for (const name of ["list_models", "list_combos", "plan_combo", "apply_combo_plan", "test_combo"]) assert(tools.some(tool => tool.name === name));
     const created = (await call("create_workflow", { task: "Teste de protocolo", steps: [
       { agent: "assistant", task: "Prepare", acceptance: "Resultado validado" },
       { agent: "assistant", task: "Revise", acceptance: "Evidencias preservadas" },

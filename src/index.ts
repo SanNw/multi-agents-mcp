@@ -8,12 +8,16 @@ import { JobManager } from "./jobs.js";
 import { ProviderRegistry } from "./providers.js";
 import { classifyTask, loadConfiguredAgents, prioritizeRoutes } from "./smart-router.js";
 import { WorkflowManager, workflowInputSchema } from "./workflows.js";
+import { ComboManager, comboPlanInput } from "./combos.js";
 
-const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.4.2" });
+const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.5.0" });
 const client = await ProviderRegistry.load();
-const jobs = new JobManager(client);
+const combos = new ComboManager(client);
+const jobs = new JobManager(client, undefined, async input => {
+  if (input.combo_selection) await combos.resolveAgent(input.agent, input.combo_selection.project_id, input.combo_selection.combo_id);
+});
 await jobs.init();
-const workflows = new WorkflowManager(jobs, loadConfiguredAgents);
+const workflows = new WorkflowManager(jobs, loadConfiguredAgents, undefined, (agent, project, combo) => combos.resolveAgent(agent, project, combo));
 
 const taskInput = {
   agent: z.string().min(1).describe("Identificador retornado por list_agents"),
@@ -29,6 +33,8 @@ const taskInput = {
   expected_ids: z.array(z.string().regex(/^S\d{4}$/)).max(2_000).optional().describe("IDs que devem aparecer uma única vez como títulos Markdown na saída"),
   expected_text: z.string().max(20_000).optional().describe("Texto exato esperado, usado em sondas e tarefas de controle"),
   min_output_chars: z.number().int().min(1).optional(),
+  project_id: z.string().min(1).max(40).optional(),
+  combo_id: z.string().min(1).max(200).optional(),
 };
 
 server.registerTool("list_agents", {
@@ -85,7 +91,7 @@ server.registerTool("delegate_agent", {
   annotations: { readOnlyHint: false, openWorldHint: true },
 }, async (input) => {
   try {
-    const agent = findAgent(await loadConfiguredAgents(), input.agent);
+    const agent = await combos.resolveAgent(findAgent(await loadConfiguredAgents(), input.agent), input.project_id, input.combo_id);
     return result(await client.delegate(agent, input.task, input.context, input.instructions, input.output_format, options(input)));
   } catch (error) {
     return failure(error);
@@ -99,8 +105,9 @@ server.registerTool("submit_agent_task", {
   annotations: { readOnlyHint: false, openWorldHint: true },
 }, async (input) => {
   try {
-    const agent = findAgent(await loadConfiguredAgents(), input.agent);
-    const job = await jobs.submit({ agent, task: input.task, context: input.context, instructions: input.instructions, output_format: input.output_format, options: options(input) });
+    const agent = await combos.resolveAgent(findAgent(await loadConfiguredAgents(), input.agent), input.project_id, input.combo_id);
+    const job = await jobs.submit({ agent, task: input.task, context: input.context, instructions: input.instructions, output_format: input.output_format, options: options(input),
+      combo_selection: input.project_id && input.combo_id ? { project_id: input.project_id, combo_id: input.combo_id } : undefined });
     return result(jobView(job, false));
   } catch (error) {
     return failure(error);
@@ -147,6 +154,8 @@ const routingInput = {
   file_count: z.number().int().min(0).max(10000).optional(),
   needs_tools: z.boolean().optional(),
   security_sensitive: z.boolean().optional(),
+  project_id: z.string().min(1).max(40).optional(),
+  combo_id: z.string().min(1).max(200).optional(),
 };
 const taskState = z.object({
   decisions: z.array(z.string().max(2000)).max(50).default([]),
@@ -174,8 +183,8 @@ server.registerTool("submit_routed_task", {
     const configured = await loadConfiguredAgents();
     const routing = classifyTask(input, configured);
     if (routing.needs_clarification) throw new Error("Tarefa mista: informe kind ou selecione um agente explicitamente");
-    const agent = findAgent(configured, routing.agent);
-    if (agent.route_strategy === "fallback") {
+    const agent = await combos.resolveAgent(findAgent(configured, routing.agent), input.project_id, input.combo_id);
+    if (agent.route_strategy === "fallback" && !input.combo_id) {
       const available = new Set((await client.models(agent.provider)).map(model => model.id));
       let routes = [agent.route, ...agent.fallback_routes].filter(route => available.has(route));
       if (!routes.length) throw new Error("Nenhuma rota configurada do agente está disponível no catálogo");
@@ -189,6 +198,7 @@ server.registerTool("submit_routed_task", {
     const context = [input.context, input.state && `ESTADO FORNECIDO PELO CODEX (não substitui arquivos reais)\n${JSON.stringify(input.state)}`].filter(Boolean).join("\n\n");
     if (context.length > 200000) throw new Error("Contexto combinado excede o limite; forneça trechos relevantes");
     const job = await jobs.submit({ agent, task: routing.task, context, routing, state: input.state,
+      combo_selection: input.project_id && input.combo_id ? { project_id: input.project_id, combo_id: input.combo_id } : undefined,
       options: { maxOutputTokens: input.max_output_tokens, timeoutMs: input.timeout_ms } });
     return result({ ...jobView(job, false), routing });
   } catch (error) { return failure(error); }
@@ -208,6 +218,47 @@ server.registerTool("list_providers", {
   description: "Lista perfis de backend, protocolo e capacidades declaradas, sem chaves ou URLs privadas. Catálogo configurado não comprova saúde de inferência.",
   annotations: { readOnlyHint: true, openWorldHint: false },
 }, async () => result({ providers: client.list() }));
+
+server.registerTool("list_models", {
+  description: "Lista IDs de modelos configurados ou anunciados pelo backend; não comprova inferência nem preço.",
+  inputSchema: { provider: z.string().default("default") },
+  annotations: { readOnlyHint: true, openWorldHint: true },
+}, async ({ provider }) => {
+  try { return result({ models: await client.models(provider), source: client.list().find(profile => profile.id === provider)!.models_source }); }
+  catch (error) { return failure(error); }
+});
+
+server.registerTool("list_combos", {
+  description: "Lista combos, propriedade por projeto e referências de CLIs em arquivos explicitamente configurados. Combos externos são protegidos; consumidores desconhecidos podem existir.",
+  inputSchema: { provider: z.string(), project_id: z.string().optional() },
+  annotations: { readOnlyHint: true, openWorldHint: true },
+}, async ({ provider, project_id }) => {
+  try { return result(await combos.list(provider, project_id)); } catch (error) { return failure(error); }
+});
+
+server.registerTool("plan_combo", {
+  description: "Planeja criação ou nova versão de combo gerido pelo projeto. Não altera o backend; nunca sobrescreve combos existentes.",
+  inputSchema: comboPlanInput.shape,
+  annotations: { readOnlyHint: false, openWorldHint: true },
+}, async input => {
+  try { return result({ plan: await combos.plan(input) }); } catch (error) { return failure(error); }
+});
+
+server.registerTool("apply_combo_plan", {
+  description: "Cria um combo novo conforme política privada, verifica o resultado e reconcilia respostas incertas sem repetir POST. Não modifica nem apaga combos anteriores.",
+  inputSchema: { plan_id: z.string().uuid() },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+}, async ({ plan_id }) => {
+  try { return result({ plan: await combos.apply(plan_id) }); } catch (error) { return failure(error); }
+});
+
+server.registerTool("test_combo", {
+  description: "Testa membros individuais do combo com prompt fixo, até 64 tokens por modelo, sem fallback ou retries do MCP. Consome cota; exige allow_tests e allowlist privada. Não modifica combos nem avalia qualidade geral.",
+  inputSchema: { provider: z.string(), project_id: z.string(), combo_id: z.string().min(1).max(200), models: z.array(z.string().min(1).max(300)).min(1).max(16).optional() },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+}, async ({ provider, project_id, combo_id, models }) => {
+  try { return result(await combos.testCombo(provider, project_id, combo_id, models)); } catch (error) { return failure(error); }
+});
 
 server.registerTool("create_workflow", {
   description: "Cria plano persistido de até oito etapas explícitas. Nenhuma inferência ou ferramenta local é executada ao criar.",

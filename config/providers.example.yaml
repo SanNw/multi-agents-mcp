@@ -1,5 +1,6 @@
 # Copie para um arquivo privado e habilite MULTIAGENTS_PROVIDERS_CONFIG.
 # Credenciais ficam somente nas variaveis de ambiente referenciadas.
+# Gestao de combos e testes: veja docs/COMBOS.md; omitida aqui para ficar desativada.
 providers:
   default:
     base_url: http://127.0.0.1:20128/v1

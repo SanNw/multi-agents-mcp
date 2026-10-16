@@ -13,7 +13,9 @@ export const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("run_tests"), command: z.array(z.string().min(1).max(1000)).min(1).max(20) }).strict(),
 ]);
 const responseSchema = z.object({ summary: z.string().min(1).max(8000), actions: z.array(actionSchema).max(5) }).strict();
-const stepSchema = z.object({ agent: z.string().min(1), task: z.string().min(1).max(20000), acceptance: z.string().min(1).max(2000) }).strict();
+const stepSchema = z.object({ agent: z.string().min(1), task: z.string().min(1).max(20000), acceptance: z.string().min(1).max(2000),
+  project_id: z.string().min(1).max(40).optional(), combo_id: z.string().min(1).max(200).optional(),
+}).strict().refine(step => Boolean(step.project_id) === Boolean(step.combo_id), "Informe project_id e combo_id juntos");
 export const workflowInputSchema = z.object({
   task: z.string().min(1).max(20000), context: z.string().max(80000).default(""),
   steps: z.array(stepSchema).min(1).max(8),
@@ -38,7 +40,8 @@ type Jobs = Pick<JobManager, "submit" | "refresh">;
 
 export class WorkflowManager {
   constructor(private readonly jobs: Jobs, private readonly agents: () => Promise<Agent[]>,
-    private readonly directory = process.env.MULTIAGENTS_WORKFLOWS_DIR ?? process.env.NINEROUTER_WORKFLOWS_DIR ?? resolve(dirname(process.env.MULTIAGENTS_JOBS_DIR ?? process.env.NINEROUTER_JOBS_DIR ?? "./.jobs"), ".workflows")) {}
+    private readonly directory = process.env.MULTIAGENTS_WORKFLOWS_DIR ?? process.env.NINEROUTER_WORKFLOWS_DIR ?? resolve(dirname(process.env.MULTIAGENTS_JOBS_DIR ?? process.env.NINEROUTER_JOBS_DIR ?? "./.jobs"), ".workflows"),
+    private readonly resolveAgent?: (agent: Agent, project?: string, combo?: string) => Promise<Agent>) {}
 
   async create(input: WorkflowInput) {
     const parsed = workflowInputSchema.parse(input);
@@ -66,8 +69,10 @@ export class WorkflowManager {
         if (step.submission_started || workflow.submissions >= 8) {
           workflow.status = "blocked"; workflow.error = "Submissão anterior incerta ou orçamento de oito chamadas esgotado; não repetir automaticamente"; return;
         }
-        const agent = (await this.agents()).find(candidate => candidate.id === specification.agent);
+        let agent = (await this.agents()).find(candidate => candidate.id === specification.agent);
         if (!agent) throw new Error("Agente da etapa não está mais configurado");
+        if (specification.combo_id && !this.resolveAgent) throw new Error("Gestão de combos não disponível neste workflow");
+        if (this.resolveAgent) agent = await this.resolveAgent(agent, specification.project_id, specification.combo_id);
         const previous = workflow.steps.slice(0, workflow.current_step).map((item, index) => ({
           step: index, summary: item.summary, evidence: item.evidence,
           action_results: item.actions.map(action => ({ type: action.type, result: action.result, status: action.status })),
@@ -77,6 +82,7 @@ export class WorkflowManager {
         step.submission_started = true; workflow.submissions++;
         await this.persist(workflow);
         const job = await this.jobs.submit({ agent, task: specification.task, context,
+          combo_selection: specification.project_id && specification.combo_id ? { project_id: specification.project_id, combo_id: specification.combo_id } : undefined,
           instructions: `Critério de revisão pelo Codex: ${specification.acceptance}. Não execute ações nem alegue execução. Retorne somente JSON {"summary":"análise/proposta", "actions":[]}. Ações opcionais: read_file com path relativo; propose_patch com path e patch; run_tests com command como array de argumentos. Sem Markdown ou campos adicionais.`,
           options: { timeoutMs: workflow.input.timeout_ms, maxOutputTokens: workflow.input.max_output_tokens, retries: 0 },
           state: { decisions: [specification.acceptance], next_steps: ["Codex verifica ações e resultado antes de avançar"] } });

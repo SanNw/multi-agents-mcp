@@ -10,6 +10,7 @@ work/
 .jobs/
 outputs/
 .workflows/
+.combos/
 release/
 **/graphify-out/
 SMART_ROUTER.md

@@ -1,5 +1,7 @@
 # Backends do MULTIAGENTS-MCP
 
+Gestão opcional de combos, proteção de rotas usadas por outras CLIs e testes individuais de modelos: [COMBOS.md](COMBOS.md). Credenciais administrativas são explícitas e separadas das de inferência.
+
 ## Endpoint unico
 
 Configure MULTIAGENTS_BASE_URL e MULTIAGENTS_API_KEY no ambiente. A URL aceita

@@ -14,6 +14,7 @@ export type JobInput = {
   output_format?: string;
   routing?: Record<string, unknown>;
   state?: Record<string, string[]>;
+  combo_selection?: { project_id: string; combo_id: string };
   options?: Pick<DelegateOptions, "timeoutMs" | "firstByteTimeoutMs" | "idleTimeoutMs" | "maxOutputTokens" | "retries" | "expectedIds" | "expectedText" | "minOutputChars">;
 };
 
@@ -38,7 +39,8 @@ export class JobManager {
   private readonly controllers = new Map<string, AbortController>();
   private readonly checkpointAt = new Map<string, number>();
 
-  constructor(private readonly runner: Runner, private readonly directory = process.env.MULTIAGENTS_JOBS_DIR ?? process.env.NINEROUTER_JOBS_DIR ?? "./.jobs") {}
+  constructor(private readonly runner: Runner, private readonly directory = process.env.MULTIAGENTS_JOBS_DIR ?? process.env.NINEROUTER_JOBS_DIR ?? "./.jobs",
+    private readonly validateInput?: (input: JobInput) => Promise<void>) {}
 
   async init() {
     await mkdir(resolve(this.directory), { recursive: true, mode: 0o700 });
@@ -130,6 +132,7 @@ export class JobManager {
     job.updated_at = new Date().toISOString();
     await this.persist(job);
     try {
+      if (this.validateInput) await this.validateInput(job.input);
       job.result = await this.runner.delegate(
         job.input.agent, job.input.task, job.input.context, job.input.instructions, job.input.output_format,
         {

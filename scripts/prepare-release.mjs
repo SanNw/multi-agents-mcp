@@ -7,7 +7,7 @@ export async function prepareRelease(root, destination) {
   const sourceRoot = await realpath(root);
   // Publication is allowlisted; private runtime files never enter staging.
   const files = ["package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".env.example", "README.md", "LICENSE", "SECURITY.md",
-    "docs/WORKFLOWS.md", "docs/PROVIDERS.md", "docs/SECURITY_ASSESSMENT.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "scripts/package.test.mjs",
+    "docs/WORKFLOWS.md", "docs/PROVIDERS.md", "docs/COMBOS.md", "docs/SECURITY_ASSESSMENT.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "scripts/package.test.mjs",
     ...(await readdir(resolve(root, "src"))).filter(name => name.endsWith(".ts")).map(name => `src/${name}`),
     "config/agents.example.yaml", "config/providers.example.yaml"];
   const manifest = []; const staged = [];
