@@ -13,6 +13,22 @@ const agent: Agent = {
   max_output_tokens: 100, retries: 0, concurrency: 1,
 };
 
+test("JSON and SSE response caps reject oversized content without retry", async () => {
+  for (const mode of ["json", "sse", "stream-json"]) {
+    const stream = mode !== "json";
+    let calls = 0;
+    await withServer((_request, response) => {
+      calls++;
+      response.setHeader("content-type", mode === "sse" ? "text/event-stream" : "application/json");
+      response.end(mode === "sse" ? `data: ${JSON.stringify({ choices: [{ delta: { content: "x".repeat(500) } }] })}\n\n` : JSON.stringify({ choices: [{ message: { content: "x".repeat(500) } }] }));
+    }, async url => {
+      await assert.rejects(new RouterClient({ NINEROUTER_URL: url }).delegate(agent, "teste", undefined, undefined, undefined,
+        { stream, maxResponseBytes: 100, retries: 1 }), (error: unknown) => error instanceof RouterError && error.code === "OUTPUT_LIMIT");
+      assert.equal(calls, 1);
+    });
+  }
+});
+
 test("retorna conclusão JSON e telemetria", async () => withServer((_request, response) => {
   response.setHeader("content-type", "application/json");
   response.end(JSON.stringify({ model: "effective", choices: [{ message: { content: "OK" }, finish_reason: "stop" }], usage: { total_tokens: 3 } }));

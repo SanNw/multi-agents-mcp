@@ -5,6 +5,7 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 const agentSchema = z.object({
+  project_id: z.string().min(1).max(40).optional(),
   task_kinds: z.array(z.enum(["development", "architecture", "documentation", "translation", "philology"])).optional(),
   provider: z.string().regex(/^[a-z][a-z0-9_-]*$/).optional(),
   route: z.string().min(1),

@@ -37,6 +37,8 @@ export type DelegateOptions = {
   stream?: boolean;
   signal?: AbortSignal;
   onProgress?: (event: { delta: string; content: string }) => void | Promise<void>;
+  beforeAttempt?: (inputBytes: number, maxOutputTokens: number) => Promise<void>;
+  maxResponseBytes?: number;
 };
 
 export type QualityIssue = {
@@ -137,6 +139,8 @@ export class RouterClient {
         attemptedRoutes.add(route);
         const body = { ...commonBody, model: route };
         try {
+          if (signal.aborted) throw signal.reason;
+          await options.beforeAttempt?.(Buffer.byteLength(JSON.stringify(body)), body.max_tokens);
           const result = body.stream
             ? await this.streamCompletion(body, signal, agent, options, requestId)
             : await this.jsonCompletion(body, signal, agent, options, requestId);
@@ -219,7 +223,7 @@ export class RouterClient {
       phase: "first_byte",
       requestId,
     });
-    const completion = await this.readJson<Completion>(response, requestId);
+    const completion = await this.readJson<Completion>(response, requestId, options.maxResponseBytes);
     const content = completion.choices?.[0]?.message?.content;
     if (!content) throw new RouterError("Backend retornou uma resposta sem conteúdo", { code: "EMPTY_COMPLETION", phase: "decode", requestId });
     return { content, model: completion.model, finishReason: completion.choices?.[0]?.finish_reason, usage: completion.usage };
@@ -236,7 +240,7 @@ export class RouterClient {
       requestId,
     });
     if (!response.headers.get("content-type")?.includes("text/event-stream")) {
-      const completion = await this.readJson<Completion>(response, requestId);
+      const completion = await this.readJson<Completion>(response, requestId, options.maxResponseBytes);
       const content = completion.choices?.[0]?.message?.content;
       if (!content) throw new RouterError("Resposta sem conteúdo", { code: "EMPTY_COMPLETION", phase: "decode", requestId });
       await options.onProgress?.({ delta: content, content });
@@ -251,12 +255,15 @@ export class RouterClient {
     let finishReason: string | undefined;
     let usage: Usage | undefined;
     let receivedContent = false;
+    let receivedBytes = 0;
     const idleMs = options.idleTimeoutMs ?? agent.idle_timeout_ms;
     try {
       while (true) {
         if (signal.aborted) throw signal.reason;
         const { done, value } = await readWithTimeout(reader, idleMs, requestId);
         if (done) break;
+        receivedBytes += value.byteLength;
+        if (receivedBytes > (options.maxResponseBytes ?? 2000000)) throw new RouterError("Resposta excede o limite de bytes", { code: "OUTPUT_LIMIT", retryable: false, requestId });
         buffer += decoder.decode(value, { stream: true });
         const events = buffer.split(/\r?\n\r?\n/);
         buffer = events.pop() ?? "";
@@ -317,8 +324,19 @@ export class RouterClient {
     }
   }
 
-  private async readJson<T>(response: Response, requestId?: string): Promise<T> {
-    const raw = await response.text();
+  private async readJson<T>(response: Response, requestId?: string, limit = 2000000): Promise<T> {
+    const reader = response.body?.getReader();
+    if (!reader) throw new RouterError("Resposta vazia", { code: "EMPTY_COMPLETION", requestId });
+    const chunks: Uint8Array[] = []; let bytes = 0;
+    try {
+      while (true) {
+        const next = await reader.read(); if (next.done) break;
+        bytes += next.value.byteLength;
+        if (bytes > limit) throw new RouterError("Resposta excede o limite de bytes", { code: "OUTPUT_LIMIT", retryable: false, requestId });
+        chunks.push(next.value);
+      }
+    } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+    const raw = Buffer.concat(chunks).toString("utf8");
     try {
       const body = JSON.parse(raw) as T & { error?: { message?: string; code?: string | number } };
       if (body.error) throw new RouterError(body.error.message ?? "Backend retornou erro", { code: String(body.error.code ?? "UPSTREAM_ERROR"), phase: "decode", requestId });
@@ -335,7 +353,21 @@ function buildUserMessage(task: string, context?: string, instructions?: string,
 }
 
 async function httpError(response: Response, requestId?: string) {
-  const raw = await response.text();
+  const reader = response.body?.getReader();
+  let raw = "";
+  if (reader) {
+    let received = 0;
+    const decoder = new TextDecoder();
+    try {
+      while (received < 65536) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        raw += decoder.decode(value.subarray(0, 65536 - received), { stream: true });
+        received += value.byteLength;
+      }
+      raw += decoder.decode();
+    } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+  }
   let message = raw.slice(0, 500) || `Backend respondeu HTTP ${response.status}`;
   try { message = (JSON.parse(raw) as { error?: { message?: string } }).error?.message ?? message; } catch { /* keep safe excerpt */ }
   const retryAfter = response.headers.get("retry-after");

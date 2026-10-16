@@ -39,6 +39,8 @@ Use your own models through OpenAI-compatible Chat Completions backends. Keep yo
 | Project combos | Discover backend combos, plan changes, and create owned versions under explicit project/model permissions. Adapters cover 9Router and OmniRoute API contracts. |
 | Protection for other CLIs | Read declared JSON configurations for route references, mark external/shared combos as protected, and replace combos by creating new versions. |
 | Individual model probes | Test members directly with a fixed prompt, bounded output, latency/error reporting, and zero MCP retries or fallbacks. |
+| Offline diagnostics | Inspect loaded version, schema references, credential presence, state access, and recovery evidence without inference. |
+| Optional shared budgets | Persist per-provider/project concurrency, request and token reservations across cooperating processes. |
 | Observability | Requested/selected route, backend-reported model, elapsed time, usage when supplied, attempt history, and structured errors. |
 | Local deployment | MCP stdio transport, private state, no additional hosted orchestration service, and no changes to the client's main model. |
 
@@ -49,7 +51,7 @@ Requires Node.js **>=20.11** and a configured backend. In Codex, use:
 ```toml
 [mcp_servers.multiagents-mcp]
 command = "npx"
-args = ["--yes", "--package=multiagents-mcp@^0.5.0", "multiagents-mcp"]
+args = ["--yes", "--package=multiagents-mcp@^0.6.0", "multiagents-mcp"]
 ```
 
 Add the private environment settings shown below, including your agent file, backend URL, credentials, and state directories. The example agent YAML below can be saved directly to your private agent file. Restart or reload the MCP connection after configuration changes.
@@ -118,7 +120,7 @@ Ask your MCP client to:
 
 The client must translate these requests into the tools below. Agents receive the context supplied by the client; they do not automatically gain filesystem or shell access.
 
-### All 23 MCP tools
+### All 25 MCP tools
 
 | Tool | Purpose |
 | --- | --- |
@@ -145,6 +147,8 @@ The client must translate these requests into the tools below. Agents receive th
 | `plan_combo` | Persist a validated project-combo proposal without backend writes. |
 | `apply_combo_plan` | Create/read back an authorized combo version; reconcile uncertain creation. |
 | `test_combo` | Probe selected individual members without changing the combo. |
+| `diagnose` | Inspect loaded configuration offline without revealing secrets or running inference. |
+| `inspect_state` | Inspect job ownership and budget reservations without recovery mutations. |
 
 ### Combos without breaking another CLI
 
@@ -154,9 +158,19 @@ Existing combos are external and protected unless ownership is established throu
 
 **Updates create a new uniquely named version.** The server never overwrites/deletes an existing combo, changes global routing settings, rewrites agent files, or switches another CLI's primary model. Use the new version explicitly with `project_id` and `combo_id` on a task or workflow step.
 
-`test_combo` sends each selected member a fixed control prompt, sequentially, with up to **64 output tokens**, a **20-second request limit**, and **zero MCP retries/fallbacks**. It requires `allow_tests`, a model allowlist, and a configurable maximum member count. Tests consume quota and may cost money; they check response availability, not general model quality. Backend alias/account fallback can still occur.
+`test_combo` defaults to `availability-v1`. Optional `text-v1`, `json-v1`, and `instructions-v1` suites check synthetic cases deterministically, with up to **64 output tokens per request**, a **20-second request limit**, and **zero MCP retries/fallbacks**. The instruction suite runs two cases per model. Model allowlists, `allow_tests`, and member-count limits apply to all suites. Private reports retain results per case; they do not guarantee general quality or trigger combo edits. Tests consume quota and may cost money. Backend alias/account fallback can still occur; tool-calling probes are deferred.
 
 Full configuration and recovery details: [project combos and probes](docs/COMBOS.md).
+
+### Diagnostics, history, and shared limits
+
+Use `diagnose` or `node dist/index.js --diagnose` for an offline configuration check; use `inspect_state` to inspect owner identity and reservations before recovery. Neither tool deletes locks, adopts jobs, or repeats calls. Loaded runtimes require an MCP reload after updates.
+
+`list_agent_tasks` supports `limit`/`offset`. `get_agent_task` returns bounded content pages with `next_content_offset`, or status only with `include_content:false`. Original stored results remain recoverable. Terminal summaries avoid loading complete history at normal startup; old records remain compatible without bulk rewriting.
+
+Tools declare output schemas. Synchronous delegation sends progress when the client supplies `progressToken`; asynchronous jobs remain accessible by polling. Optional private provider `limits` reserve concurrency, requests, and conservative token units across cooperating processes. Input/output/response caps reject oversized operations explicitly. Reservations are not exact usage or monetary guarantees; uncertain execution keeps its reservation pending inspection.
+
+See [configuration and operational limits](docs/OPERATIONS.md). Private-state behavior is validated on Linux/WSL; native Windows ACL privacy and complete macOS lifecycle behavior are not certified. [Native Tasks](docs/TASKS-COMPATIBILITY.md) remain an experimental protocol test, without production migration.
 
 ### Execution and security boundaries
 
@@ -177,6 +191,8 @@ npm pack --dry-run --ignore-scripts
 ```
 
 Release preparation stages an explicit allowlist for review; it does not publish. Private agents, credentials, jobs, workflows, combo plans, snapshots, and runtime data stay out of the public package.
+
+The manual [npm release workflow](docs/RELEASING.md) is prepared for tagged, CI-approved publication of the exact tested tarball with OIDC/provenance. An operator must first configure the external trusted publisher and protected GitHub environment; this checkout does not imply a completed live publication. Features described here reflect source changes and may precede the installed npm release.
 
 ---
 
@@ -206,6 +222,8 @@ Os nomes, papéis, modelos, provedores, fallbacks e permissões são seus. Não 
 | Combos por projeto | Descubra combos, planeje criações e gere versões próprias usando os contratos de API do 9Router e OmniRoute. |
 | Proteção de outras CLIs | Identifique referências em arquivos declarados e preserve combos externos e versões anteriores. |
 | Testes individuais | Verifique cada modelo de um combo, com resposta, latência, erro e uso informado pelo backend. |
+| Diagnóstico offline | Inspecione versão, referências, presença de credenciais e acesso ao estado sem executar inferência. |
+| Orçamentos opcionais | Compartilhe reservas de concorrência, requisições e tokens entre processos cooperantes. |
 | Observabilidade | Confira rota solicitada/selecionada, modelo reportado, tentativas e consumo quando disponível. |
 | Execução local | Use MCP stdio com estado privado, sem serviço adicional de orquestração hospedado. |
 
@@ -233,7 +251,7 @@ Nenhum nome de agente é obrigatório. Há especializações de desenvolvimento,
 
 ### Ferramentas disponíveis
 
-- **Descoberta:** `list_agents`, `list_providers`, `list_models`, `health_check`.
+- **Descoberta e diagnóstico:** `list_agents`, `list_providers`, `list_models`, `health_check`, `diagnose`, `inspect_state`.
 - **Delegação e jobs:** `route_task`, `delegate_agent`, `submit_agent_task`, `submit_routed_task`, `get_agent_task`, `list_agent_tasks`, `cancel_agent_task`, `retry_agent_task`.
 - **Workflows:** `create_workflow`, `get_workflow`, `advance_workflow`, `approve_workflow_action`, `record_workflow_action`, `review_workflow_step`, `replan_workflow`.
 - **Combos e testes:** `list_combos`, `plan_combo`, `apply_combo_plan`, `test_combo`.
@@ -246,9 +264,19 @@ Combos externos são protegidos. A descoberta de consumidores lê apenas arquivo
 
 Para usar uma versão nova, informe `project_id` e `combo_id` na tarefa ou etapa do workflow. Jobs revalidam a seleção antes de executar, inclusive em novas tentativas.
 
-`test_combo` testa membros diretamente, em sequência, com prompt fixo, até 64 tokens de saída e 20 segundos por requisição, sem fallback/repetição pelo MCP. Exige autorização e limite de modelos por chamada. Consome cota e pode gerar custo; mede disponibilidade e resposta de controle, não qualidade geral. O próprio backend ainda pode resolver aliases ou trocar contas.
+`test_combo` mantém `availability-v1` como padrão e oferece as suítes opcionais `text-v1`, `json-v1` e `instructions-v1`. Cada caso usa até 64 tokens e 20 segundos, sem fallback/repetição pelo MCP; a suíte de instruções tem dois casos por modelo. Permissões, allowlist e limite de modelos continuam obrigatórios. Relatórios privados mostram resultados determinísticos por caso, sem garantir qualidade geral ou modificar combos. Os testes consomem cota e podem gerar custos; o backend ainda pode resolver aliases ou trocar contas. Testes de ferramentas permanecem adiados.
 
 Configuração, permissões e recuperação: [combos e testes](docs/COMBOS.md).
+
+### Diagnóstico, histórico e operação
+
+Há 25 ferramentas. `diagnose` e `--diagnose` verificam a configuração offline; `inspect_state` inspeciona propriedade e reservas sem apagar locks ou repetir operações. Alterações de runtime/configuração exigem recarregar o MCP.
+
+O histórico usa resumos leves e preserva os registros originais. Listagens aceitam `limit`/`offset`; conteúdo pode ser recuperado por páginas com `next_content_offset`, ou omitido com `include_content:false`. Ferramentas anunciam schemas de saída; progresso depende de `progressToken` fornecido pelo cliente e não substitui a consulta de jobs.
+
+`limits` no provider habilita reservas compartilhadas opcionais. Processos precisam compartilhar configuração e diretório privado. Requisições, concorrência e unidades conservadoras de tokens são limitadas antes das tentativas; isso não representa custo monetário ou tokenização exata. Operações incertas exigem inspeção. Veja [operação e recuperação](docs/OPERATIONS.md).
+
+Linux/WSL é o escopo confirmado para estado privado. Windows nativo/macOS não foram certificados integralmente. Tasks seguem como [experimento de protocolo](docs/TASKS-COMPATIBILITY.md), e o [workflow OIDC](docs/RELEASING.md) está preparado, dependendo de configuração externa e autorização do operador. Estas alterações de código não comprovam atualização do runtime instalado ou publicação no npm.
 
 ### Limites importantes
 

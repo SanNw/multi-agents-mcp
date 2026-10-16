@@ -1,14 +1,14 @@
 {
   "name": "MULTIAGENTS-MCP",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "files": [
     {
       "path": "package.json",
-      "sha256": "87541c79e9a07d753fe2420b3ec62f0eeebe12ee452d332f4159efa482b4e3e2"
+      "sha256": "b017f3f1897f2899fd78f78e75fcf11b42b4e68b7434c5ed782caf8e3d31e72c"
     },
     {
       "path": "package-lock.json",
-      "sha256": "b6c2b86fdb405e6aac3aa5ed3d70e3424386a426fdc18b4af31e2c018bd502bf"
+      "sha256": "9e2b33b34e2f8dfbd597ceeedac6d83660c1b7293172487bbbe6bd3852ef8604"
     },
     {
       "path": "tsconfig.json",
@@ -16,7 +16,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "557500d990c646915b2a7f528b808983aaf9b588fc0447c0224bb87ef93e3097"
+      "sha256": "6257b022d37461167fab9276a1b9eaf3ca0bac3ccb81fb82e44c1d3ae846db3e"
     },
     {
       "path": ".env.example",
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "87d16b4b03e3c5913783469597867a95c3ad97e5a4e7c3c7a399fe6923dab070"
+      "sha256": "95673019ed1f066afb8aba3b487df6df0131e2c876dda821184d0c50335cefcc"
     },
     {
       "path": "LICENSE",
@@ -44,7 +44,19 @@
     },
     {
       "path": "docs/COMBOS.md",
-      "sha256": "9547102a6df21bc3dd891a2fa753e50643c5a4da891bf49d018fecce7819621b"
+      "sha256": "27acd19882d40ef86b9e1b1f22e09b82df01abec2bc9f580541b6eec37e0f018"
+    },
+    {
+      "path": "docs/OPERATIONS.md",
+      "sha256": "ebb58488235aade7d5cae1063ade730d0632414f6962467b887354c29c459f18"
+    },
+    {
+      "path": "docs/RELEASING.md",
+      "sha256": "29967f78e86321b95f756475807e438de940430e7d1dec1483faae53ad30bb5e"
+    },
+    {
+      "path": "docs/TASKS-COMPATIBILITY.md",
+      "sha256": "7e3a0bd4dcfab94791e7017554f3c90b4fc1a65d029d396f0d11d16136ae42fe"
     },
     {
       "path": "docs/SECURITY_ASSESSMENT.md",
@@ -55,16 +67,28 @@
       "sha256": "b77606f2d4cc2bd8b7cab1c70297ad37b0958ea12831114a3954bbb8492e4063"
     },
     {
+      "path": ".github/workflows/publish.yml",
+      "sha256": "79782a9b90bb2472d0875bccd482dc62c8d9ee312557cff8eff50094d017d22e"
+    },
+    {
       "path": "scripts/prepare-release.mjs",
-      "sha256": "5f46d18343ae2fa80a7d5f6d9b81c357cd316549357699afa005e88106328297"
+      "sha256": "40f0c7800c91091140b9f233d4046b2dc68f09f622cf26d1a909dfc9b974d00c"
     },
     {
       "path": "scripts/prepare-release.test.mjs",
-      "sha256": "fdd1bed961e68853d93129a12eedd1f3380c613ec1dacfc86b37e0b43a5e40b6"
+      "sha256": "fbe4f81ece5580e84620eb45c74e4959cf90d8b507762016f2a460cf051660b2"
     },
     {
       "path": "scripts/package.test.mjs",
-      "sha256": "6f8a7604a49863b08f274ff82f4e3deee61b27344d6e4fb64a4b6a679b8ce16b"
+      "sha256": "cf2f39c51f9bbbfdec95cb573e96fc58f7a70ff6cebe73f8afa9e865e594b76b"
+    },
+    {
+      "path": "scripts/publish-workflow.test.mjs",
+      "sha256": "d248a83b788175dd129c6aa588ac3e4c80f12dbdd33dd3a6cd052525ab74fac4"
+    },
+    {
+      "path": "scripts/benchmark-history.mjs",
+      "sha256": "af0c9d09c0cc6d2d44f0618d492f327f98d9ca2334937b8c3e300eac31e0a976"
     },
     {
       "path": "src/agents.test.ts",
@@ -72,19 +96,43 @@
     },
     {
       "path": "src/agents.ts",
-      "sha256": "1a0a987dbc7065e082bcdad341b08ddeb8d66e8da51b017eab91786607f9d437"
+      "sha256": "0c857ca96faba50de07d199ce336f98ec27f4d9bbb8fb9e1155e061a4c2c68a2"
+    },
+    {
+      "path": "src/budgets.test.ts",
+      "sha256": "12500d7042f9c84218b04810af3fe2a724d592b4e2ec8ebef6ade465a89ce285"
+    },
+    {
+      "path": "src/budgets.ts",
+      "sha256": "b5103304481a1d0cc816602a854c6846096d4b1f52a33553c5c2665e67f1317f"
+    },
+    {
+      "path": "src/combo-client.test.ts",
+      "sha256": "5c6c9f58115112b8134d54abeb093d0e079d25a276c1e53df3a0048eeafb8f28"
     },
     {
       "path": "src/combo-client.ts",
-      "sha256": "cd1fe9ff0743478241853814869fd2fb53e3dcfdc42214bcbf3aa4f28809a35e"
+      "sha256": "777ff98aad9bfe57140afe6d69aa01bcc94e7843aa225534300a3c8a876c62ca"
+    },
+    {
+      "path": "src/combo-probes.ts",
+      "sha256": "d92b20f431afdebee7bb79b8363c3e8b37621b5aeae93ba6525505e6082df931"
     },
     {
       "path": "src/combos.test.ts",
-      "sha256": "f02c5f479a119675ff544b81062bdf3b5208afb7226875d1524ecdce5c439985"
+      "sha256": "8c2af5ea3328a12c35421a96c9db3979a2718dd10c7a015d48dd8e068bd769cb"
     },
     {
       "path": "src/combos.ts",
-      "sha256": "b9976d42828668e3d31bfafadf8b5ce00004382f9874bde7d38af6dbc8698097"
+      "sha256": "1035f62c7fe4560d6d7e50e107c3fb7e2ad2c988af56578eb1bb54d4d33b21b9"
+    },
+    {
+      "path": "src/diagnostics.test.ts",
+      "sha256": "343171d951018aa4c4b7a52c44e88fae5cc15f615d2ecedc75a178ea84ed45b3"
+    },
+    {
+      "path": "src/diagnostics.ts",
+      "sha256": "1c3e5ffb5959e40afa02b1ad06ca657c44654e37fd85d905fcce54905f7e4037"
     },
     {
       "path": "src/errors.ts",
@@ -92,31 +140,31 @@
     },
     {
       "path": "src/index.ts",
-      "sha256": "bea1022d7e2a2e41a686ab49decbe30b69c10fd4b750e9997f9794ab97ed35bd"
+      "sha256": "e5be4bfa81ffda8fe835439fa06d7b7ba0558574ea384d3fb84ef7ba69144bb9"
     },
     {
       "path": "src/jobs.test.ts",
-      "sha256": "a032482d831539c967965000b26f8280e0df480db6371e00e8231a6401a87cda"
+      "sha256": "2b6730cdf0d5288012795da654f9bf0a014319a87bd77b03e7a24892bad9461e"
     },
     {
       "path": "src/jobs.ts",
-      "sha256": "593fda0de5d9e2b3bf20b261933224089dda70b9f219e0549c754fc919befc7a"
+      "sha256": "1ef6605bd6c093ce2df018c59e17d53f57ba2e7822049c582b6dc3107d8b25b0"
     },
     {
       "path": "src/providers.test.ts",
-      "sha256": "574fcbd1dc5c7fe234d5e692fbf8eee118832c113bc83c80a148cf99bfab4fd3"
+      "sha256": "258b5cc9111f745cae6f54714c718644796fae449093741a1ac54a956888f543"
     },
     {
       "path": "src/providers.ts",
-      "sha256": "b8d31eb4a453f8fb68deabe0675716ecf760e4a32e860bd014984aa9a32c3160"
+      "sha256": "51e63478774f96a45070d687d8509ffea781d67578b05b6cd677c0865534a801"
     },
     {
       "path": "src/router-client.test.ts",
-      "sha256": "64691d271d701af75e3ef4bc3bfa39e7f5a24fb44981b0f0fbecdeb024052350"
+      "sha256": "9bbb00fd366622f449112c0cb03c8e9da5fbdb847b4d5b2ee47335625ab8dcd3"
     },
     {
       "path": "src/router-client.ts",
-      "sha256": "911ea0637edb9f357b6087e9fd8cd7936b8e16798fa56ddbd9ac5f044cd1eb83"
+      "sha256": "31148ba4f01213a138dfd08e4b4de3b639e6e6b2868051ca3d880c952d8926f0"
     },
     {
       "path": "src/security-mcp.test.ts",
@@ -135,8 +183,20 @@
       "sha256": "52d45212cd9a180924f23ccfbb0d8eba939a189f1f6bae2f1d68efcd60008988"
     },
     {
+      "path": "src/tasks-compat.test.ts",
+      "sha256": "8836b38d8d3a2ac2ac527439bc662bdbb616583964fbb2dafb743864760ec8f3"
+    },
+    {
+      "path": "src/tool-schemas.test.ts",
+      "sha256": "53b64bc63ebca15238c740d10065c8f22deb61f73213def813ca17a428db9a21"
+    },
+    {
+      "path": "src/tool-schemas.ts",
+      "sha256": "2eb44dc9abe45fd8bb8514ed31d5532c1a839eb4ac6f0887e43117365f3d877b"
+    },
+    {
       "path": "src/workflow-mcp.test.ts",
-      "sha256": "4f9476f14665029a34c30a27a9b9489792ff534d97d373f793aefe7133a4cebe"
+      "sha256": "552fb587d14d9c83cd5713d03bb85a9071eb0d66dba73c693c4369dc7bf0664e"
     },
     {
       "path": "src/workflows.test.ts",

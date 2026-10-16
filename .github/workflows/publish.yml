@@ -1,0 +1,93 @@
+name: Publish npm
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact package version; dispatch from the matching release tag
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify version and immutable release target
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const version = process.env.RELEASE_VERSION;
+          assert.match(version, /^\d+\.\d+\.\d+$/);
+          assert.equal(JSON.parse(readFileSync('package.json', 'utf8')).version, version);
+          assert.equal(process.env.GITHUB_REF, `refs/tags/v${version}`);
+          const target = execFileSync('git', ['rev-parse', `refs/tags/v${version}^{commit}`], { encoding: 'utf8' }).trim();
+          assert.equal(target, process.env.GITHUB_SHA);
+          assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), target);
+          NODE
+      - name: Require successful CI for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" -f head_sha="$GITHUB_SHA" -f status=completed -f per_page=100 > "$RUNNER_TEMP/ci-runs.json"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const runs = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/ci-runs.json`, 'utf8')).workflow_runs;
+          assert(runs.some(run => run.head_sha === process.env.GITHUB_SHA && run.status === 'completed' && run.conclusion === 'success' && run.path === '.github/workflows/ci.yml' && ['push', 'pull_request'].includes(run.event)), 'Successful CI for release commit required');
+          NODE
+      - name: Check trusted publishing runtime
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          assert.equal(Number(process.versions.node.split('.')[0]), 24);
+          const version = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim().split('.').map(Number);
+          assert(version[0] > 11 || version[0] === 11 && (version[1] > 5 || version[1] === 5 && version[2] >= 1), 'npm >=11.5.1 required');
+          assert(!process.env.NODE_AUTH_TOKEN && !process.env.NPM_TOKEN, 'Use OIDC without npm tokens');
+          NODE
+      - run: npm ci
+      - run: npm test
+      - run: npm run release:prepare
+      - name: Pack tested source once
+        run: npm pack --ignore-scripts --json > "$RUNNER_TEMP/npm-pack.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: published-npm-package
+          path: multiagents-mcp-*.tgz
+          if-no-files-found: error
+      - name: Publish exact tarball with provenance
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          const [pack] = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/npm-pack.json`, 'utf8'));
+          assert.match(pack.filename, /^multiagents-mcp-\d+\.\d+\.\d+\.tgz$/);
+          const integrity = 'sha512-' + createHash('sha512').update(readFileSync(pack.filename)).digest('base64');
+          assert.equal(pack.integrity, integrity);
+          execFileSync('npm', ['publish', pack.filename, '--ignore-scripts', '--provenance', '--access', 'public', '--registry', 'https://registry.npmjs.org/'], { stdio: 'inherit' });
+          const remote = execFileSync('npm', ['view', `${pack.name}@${pack.version}`, 'dist.integrity', '--json', '--registry', 'https://registry.npmjs.org/'], { encoding: 'utf8' });
+          assert.equal(JSON.parse(remote), integrity, 'Registry tarball integrity differs');
+          NODE

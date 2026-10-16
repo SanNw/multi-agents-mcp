@@ -9,8 +9,15 @@ import { ProviderRegistry } from "./providers.js";
 import { classifyTask, loadConfiguredAgents, prioritizeRoutes } from "./smart-router.js";
 import { WorkflowManager, workflowInputSchema } from "./workflows.js";
 import { ComboManager, comboPlanInput } from "./combos.js";
+import { probeSuiteNames } from "./combo-probes.js";
+import { diagnoseConfiguration, inspectStateLocks, serverVersion } from "./diagnostics.js";
+import { outputSchemas } from "./tool-schemas.js";
 
-const server = new McpServer({ name: "MULTIAGENTS-MCP", version: "0.5.0" });
+if (process.argv.includes("--diagnose")) {
+  process.stdout.write(JSON.stringify(await diagnoseConfiguration(), null, 2) + "\n");
+  process.exit(0);
+}
+const server = new McpServer({ name: "MULTIAGENTS-MCP", version: serverVersion });
 const client = await ProviderRegistry.load();
 const combos = new ComboManager(client);
 const jobs = new JobManager(client, undefined, async input => {
@@ -21,10 +28,10 @@ const workflows = new WorkflowManager(jobs, loadConfiguredAgents, undefined, (ag
 
 const taskInput = {
   agent: z.string().min(1).describe("Identificador retornado por list_agents"),
-  task: z.string().min(1),
-  context: z.string().optional(),
-  instructions: z.string().optional(),
-  output_format: z.string().optional(),
+  task: z.string().min(1).max(2000000),
+  context: z.string().max(2000000).optional(),
+  instructions: z.string().max(2000000).optional(),
+  output_format: z.string().max(2000000).optional(),
   timeout_ms: z.number().int().min(1_000).optional(),
   first_byte_timeout_ms: z.number().int().min(1_000).optional(),
   idle_timeout_ms: z.number().int().min(1_000).optional(),
@@ -38,6 +45,7 @@ const taskInput = {
 };
 
 server.registerTool("list_agents", {
+  outputSchema: outputSchemas.list_agents,
   title: "Listar agentes do 9Router",
   description: "Lista os subagentes semânticos e suas políticas de execução, sem expor chaves.",
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -48,6 +56,7 @@ server.registerTool("list_agents", {
 });
 
 server.registerTool("health_check", {
+  outputSchema: outputSchemas.health_check,
   title: "Verificar 9Router",
   description: "Em modo shallow verifica /v1/models; em inference executa uma inferência mínima nos agentes selecionados.",
   inputSchema: {
@@ -85,20 +94,31 @@ server.registerTool("health_check", {
 });
 
 server.registerTool("delegate_agent", {
+  outputSchema: outputSchemas.delegate_agent,
   title: "Delegar tarefa síncrona",
   description: "Executa uma tarefa curta e aguarda a resposta. Para tarefas longas, use submit_agent_task.",
   inputSchema: taskInput,
   annotations: { readOnlyHint: false, openWorldHint: true },
-}, async (input) => {
+}, async (input, extra) => {
   try {
     const agent = await combos.resolveAgent(findAgent(await loadConfiguredAgents(), input.agent), input.project_id, input.combo_id);
-    return result(await client.delegate(agent, input.task, input.context, input.instructions, input.output_format, options(input)));
+    const token = extra._meta?.progressToken;
+    let progress = 0;
+    const notify = async (message: string) => {
+      if (token !== undefined && !extra.signal.aborted) await extra.sendNotification({ method: "notifications/progress", params: { progressToken: token, progress: progress++, message } }).catch(() => undefined);
+    };
+    await notify("Inferência iniciada; total de trabalho desconhecido.");
+    const response = await client.delegate(agent, input.task, input.context, input.instructions, input.output_format, { ...options(input), signal: extra.signal,
+      ...(token !== undefined ? { stream: true, onProgress: async () => notify("Novo trecho de resposta recebido; não representa porcentagem de conclusão.") } : {}) });
+    await notify("Inferência encerrada.");
+    return result(response);
   } catch (error) {
     return failure(error);
   }
 });
 
 server.registerTool("submit_agent_task", {
+  outputSchema: outputSchemas.submit_agent_task,
   title: "Enviar tarefa assíncrona",
   description: "Enfileira uma tarefa longa, grava checkpoints parciais e retorna imediatamente um job_id.",
   inputSchema: taskInput,
@@ -115,16 +135,27 @@ server.registerTool("submit_agent_task", {
 });
 
 server.registerTool("get_agent_task", {
+  outputSchema: outputSchemas.get_agent_task,
   title: "Consultar tarefa assíncrona",
   description: "Consulta estado, telemetria e conteúdo parcial ou final de uma tarefa.",
-  inputSchema: { job_id: z.string().uuid(), include_content: z.boolean().default(true) },
+  inputSchema: { job_id: z.string().uuid(), include_content: z.boolean().default(true), offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(100000).default(16000) },
   annotations: { readOnlyHint: true, openWorldHint: false },
-}, async ({ job_id, include_content }) => {
-  try { return result(jobView(await jobs.refresh(job_id), include_content)); }
+}, async ({ job_id, include_content, offset, limit }) => {
+  try {
+    const job = await jobs.refresh(job_id);
+    const view = jobView(job, include_content);
+    if (!include_content) return result(view);
+    const content = job.result?.content ?? job.partial_content;
+    const next = offset + limit < content.length ? offset + limit : null;
+    return result({ ...view, partial_content: job.result ? "" : content.slice(offset, offset + limit),
+      result: job.result ? { ...job.result, content: content.slice(offset, offset + limit) } : undefined,
+      content_total_chars: content.length, content_offset: offset, content_truncated: next !== null, next_content_offset: next });
+  }
   catch (error) { return failure(error); }
 });
 
 server.registerTool("cancel_agent_task", {
+  outputSchema: outputSchemas.cancel_agent_task,
   title: "Cancelar tarefa assíncrona",
   description: "Cancela uma tarefa pendente ou em execução sem apagar seus checkpoints.",
   inputSchema: { job_id: z.string().uuid() },
@@ -135,6 +166,7 @@ server.registerTool("cancel_agent_task", {
 });
 
 server.registerTool("retry_agent_task", {
+  outputSchema: outputSchemas.retry_agent_task,
   title: "Repetir tarefa assíncrona",
   description: "Cria uma nova tentativa a partir de uma tarefa encerrada sem sucesso e preserva o histórico anterior.",
   inputSchema: { job_id: z.string().uuid() },
@@ -167,6 +199,7 @@ const taskState = z.object({
 });
 
 server.registerTool("route_task", {
+  outputSchema: outputSchemas.route_task,
   description: "Seleciona agente com sinais de tipo, complexidade, arquivos, contexto e preferência explícita. Não executa inferência nem altera arquivos.",
   inputSchema: routingInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
@@ -175,6 +208,7 @@ server.registerTool("route_task", {
 });
 
 server.registerTool("submit_routed_task", {
+  outputSchema: outputSchemas.submit_routed_task,
   description: "Roteia e enfileira uma análise/proposta, preservando estado estruturado. @id no início seleciona um agente configurado. O cliente executa arquivos e comandos; o MCP não os executa.",
   inputSchema: { ...routingInput, state: taskState.optional(), max_output_tokens: z.number().int().min(1).max(12000).default(4000), timeout_ms: z.number().int().min(1000).max(600000).default(120000) },
   annotations: { readOnlyHint: false, openWorldHint: true },
@@ -205,21 +239,24 @@ server.registerTool("submit_routed_task", {
 });
 
 server.registerTool("list_agent_tasks", {
+  outputSchema: outputSchemas.list_agent_tasks,
   description: "Consulta histórico e telemetria de tarefas persistidas, sem exibir prompts ou conteúdo por padrão.",
-  inputSchema: { limit: z.number().int().min(1).max(100).default(20) },
+  inputSchema: { limit: z.number().int().min(1).max(100).default(20), offset: z.number().int().min(0).default(0) },
   annotations: { readOnlyHint: true, openWorldHint: false },
-}, async ({ limit }) => result({ jobs: jobs.list(limit).map(job => ({ ...jobView(job, false),
+}, async ({ limit, offset }) => result({ jobs: jobs.list(limit, offset).map(job => ({ ...jobView(job, false),
   selected_route: job.result?.selected_route ?? null, effective_model: job.result?.effective_model ?? null,
   elapsed_ms: job.result?.elapsed_ms ?? null, usage: job.result?.usage ?? null,
   attempts: job.result?.attempts ?? job.error?.attempts ?? [],
 })) }));
 
 server.registerTool("list_providers", {
+  outputSchema: outputSchemas.list_providers,
   description: "Lista perfis de backend, protocolo e capacidades declaradas, sem chaves ou URLs privadas. Catálogo configurado não comprova saúde de inferência.",
   annotations: { readOnlyHint: true, openWorldHint: false },
 }, async () => result({ providers: client.list() }));
 
 server.registerTool("list_models", {
+  outputSchema: outputSchemas.list_models,
   description: "Lista IDs de modelos configurados ou anunciados pelo backend; não comprova inferência nem preço.",
   inputSchema: { provider: z.string().default("default") },
   annotations: { readOnlyHint: true, openWorldHint: true },
@@ -229,6 +266,7 @@ server.registerTool("list_models", {
 });
 
 server.registerTool("list_combos", {
+  outputSchema: outputSchemas.list_combos,
   description: "Lista combos, propriedade por projeto e referências de CLIs em arquivos explicitamente configurados. Combos externos são protegidos; consumidores desconhecidos podem existir.",
   inputSchema: { provider: z.string(), project_id: z.string().optional() },
   annotations: { readOnlyHint: true, openWorldHint: true },
@@ -237,6 +275,7 @@ server.registerTool("list_combos", {
 });
 
 server.registerTool("plan_combo", {
+  outputSchema: outputSchemas.plan_combo,
   description: "Planeja criação ou nova versão de combo gerido pelo projeto. Não altera o backend; nunca sobrescreve combos existentes.",
   inputSchema: comboPlanInput.shape,
   annotations: { readOnlyHint: false, openWorldHint: true },
@@ -245,6 +284,7 @@ server.registerTool("plan_combo", {
 });
 
 server.registerTool("apply_combo_plan", {
+  outputSchema: outputSchemas.apply_combo_plan,
   description: "Cria um combo novo conforme política privada, verifica o resultado e reconcilia respostas incertas sem repetir POST. Não modifica nem apaga combos anteriores.",
   inputSchema: { plan_id: z.string().uuid() },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -253,14 +293,32 @@ server.registerTool("apply_combo_plan", {
 });
 
 server.registerTool("test_combo", {
-  description: "Testa membros individuais do combo com prompt fixo, até 64 tokens por modelo, sem fallback ou retries do MCP. Consome cota; exige allow_tests e allowlist privada. Não modifica combos nem avalia qualidade geral.",
-  inputSchema: { provider: z.string(), project_id: z.string(), combo_id: z.string().min(1).max(200), models: z.array(z.string().min(1).max(300)).min(1).max(16).optional() },
+  outputSchema: outputSchemas.test_combo,
+  description: "Testa membros individuais com suítes fixas e até 64 tokens por requisição, sem fallback ou retries do MCP. Consome cota; exige allow_tests e allowlist privada. Não modifica combos nem avalia qualidade geral.",
+  inputSchema: { provider: z.string(), project_id: z.string(), combo_id: z.string().min(1).max(200), models: z.array(z.string().min(1).max(300)).min(1).max(16).optional(), suite: z.enum(probeSuiteNames).default("availability-v1") },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-}, async ({ provider, project_id, combo_id, models }) => {
-  try { return result(await combos.testCombo(provider, project_id, combo_id, models)); } catch (error) { return failure(error); }
+}, async ({ provider, project_id, combo_id, models, suite }) => {
+  try { return result(await combos.testCombo(provider, project_id, combo_id, models, suite)); } catch (error) { return failure(error); }
+});
+
+server.registerTool("diagnose", {
+  outputSchema: outputSchemas.diagnose,
+  description: "Diagnóstico offline da versão carregada, agentes, provedores e diretórios. Não revela segredos, não consulta a rede nem executa inferência.",
+  inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false },
+}, async () => {
+  try { return result(await diagnoseConfiguration()); } catch (error) { return failure(error); }
+});
+
+server.registerTool("inspect_state", {
+  outputSchema: outputSchemas.inspect_state,
+  description: "Inspeciona propriedade dos jobs, corrupção conhecida e reservas de orçamento. Não adota jobs, não remove locks nem reexecuta chamadas.",
+  inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false },
+}, async () => {
+  try { return result({ jobs: await jobs.inspect(), budgets: await client.inspectBudgets(), locks: await inspectStateLocks(), mutated: false }); } catch (error) { return failure(error); }
 });
 
 server.registerTool("create_workflow", {
+  outputSchema: outputSchemas.create_workflow,
   description: "Cria plano persistido de até oito etapas explícitas. Nenhuma inferência ou ferramenta local é executada ao criar.",
   inputSchema: workflowInputSchema.shape,
   annotations: { readOnlyHint: false, openWorldHint: false },
@@ -269,6 +327,7 @@ server.registerTool("create_workflow", {
 });
 
 server.registerTool("get_workflow", {
+  outputSchema: outputSchemas.get_workflow,
   description: "Lê plano, jobs, propostas de ações e evidências persistidas sem avançar ou consumir inferência.",
   inputSchema: { workflow_id: z.uuid() }, annotations: { readOnlyHint: true, openWorldHint: false },
 }, async ({ workflow_id }) => {
@@ -276,6 +335,7 @@ server.registerTool("get_workflow", {
 });
 
 server.registerTool("advance_workflow", {
+  outputSchema: outputSchemas.advance_workflow,
   description: "Submete no máximo uma etapa, ou coleta seu resultado. Para antes de ações/revisão. Respostas são propostas não confiáveis; Codex controla ferramentas locais.",
   inputSchema: { workflow_id: z.uuid() }, annotations: { readOnlyHint: false, openWorldHint: true },
 }, async ({ workflow_id }) => {
@@ -283,6 +343,7 @@ server.registerTool("advance_workflow", {
 });
 
 server.registerTool("approve_workflow_action", {
+  outputSchema: outputSchemas.approve_workflow_action,
   description: "Registra aprovação/rejeição do Codex para uma proposta. NÃO concede permissões do sistema e NÃO executa a ação; respeite autorizações do usuário.",
   inputSchema: { workflow_id: z.uuid(), action_id: z.uuid(), approved: z.boolean() },
   annotations: { readOnlyHint: false, openWorldHint: false },
@@ -291,6 +352,7 @@ server.registerTool("approve_workflow_action", {
 });
 
 server.registerTool("record_workflow_action", {
+  outputSchema: outputSchemas.record_workflow_action,
   description: "Registra resultado e evidência de uma ação aprovada que o Codex executou com suas ferramentas. Não executa comandos nem atesta resultados por conta própria.",
   inputSchema: { workflow_id: z.uuid(), action_id: z.uuid(), success: z.boolean(), evidence: z.string().min(1).max(8000) },
   annotations: { readOnlyHint: false, openWorldHint: false },
@@ -299,6 +361,7 @@ server.registerTool("record_workflow_action", {
 });
 
 server.registerTool("review_workflow_step", {
+  outputSchema: outputSchemas.review_workflow_step,
   description: "Codex verifica critérios e evidências, aceita ou rejeita a etapa. Aceitar prepara a próxima etapa, mas não a submete automaticamente.",
   inputSchema: { workflow_id: z.uuid(), accepted: z.boolean(), evidence: z.string().min(1).max(8000) },
   annotations: { readOnlyHint: false, openWorldHint: false },
@@ -307,6 +370,7 @@ server.registerTool("review_workflow_step", {
 });
 
 server.registerTool("replan_workflow", {
+  outputSchema: outputSchemas.replan_workflow,
   description: "Substitui explicitamente etapas pendentes de um workflow bloqueado, preservando o plano anterior. Limite de duas revisões e oito inferências no total; não repete ações locais.",
   inputSchema: { workflow_id: z.uuid(), steps: workflowInputSchema.shape.steps, reason: z.string().min(1).max(2000) },
   annotations: { readOnlyHint: false, openWorldHint: false },

@@ -30,6 +30,23 @@ export const comboSchema = z.object({
 });
 export type Combo = z.infer<typeof comboSchema>;
 export type ComboDefinition = { name: string; models: string[]; strategy: "priority" | "backend-default" };
+const originals = new WeakMap<Combo, Record<string, unknown>>();
+const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([key, entry]) => [key, canonical(entry)]));
+  return value;
+}
+export function sameRevision(saved: Combo, current: Combo) {
+  if (saved.id !== current.id) return false;
+  if (saved.revision?.startsWith("canonical-v1:")) return saved.revision === current.revision;
+  const raw = originals.get(current);
+  if (!raw || !saved.revision) return false;
+  if (hash(raw) === saved.revision) return true;
+  const keys = Object.keys(saved).filter(key => key !== "revision" && Object.hasOwn(raw, key));
+  if (keys.length !== Object.keys(raw).length) return false;
+  return hash(Object.fromEntries(keys.map(key => [key, raw[key]]))) === saved.revision;
+}
 
 export class ComboClient {
   private readonly base: string;
@@ -42,9 +59,12 @@ export class ComboClient {
   async list(): Promise<Combo[]> {
     const combos: Combo[] = [];
     for (let offset = 0; offset < 10000; offset += 100) {
-      const page = z.object({ combos: z.array(z.record(z.string(), z.unknown())), total: z.number().int().nonnegative().optional() })
-        .parse(await this.request("GET", `/api/combos?limit=100&offset=${offset}`));
+      const parsed = z.object({ combos: z.array(z.record(z.string(), z.unknown())).max(100), total: z.number().int().nonnegative().optional() })
+        .safeParse(await this.request("GET", `/api/combos?limit=100&offset=${offset}`));
+      if (!parsed.success) throw new Error("Contrato administrativo não suportado");
+      const page = parsed.data;
       combos.push(...page.combos.map(combo => this.normalize(combo)));
+      if (new Set(combos.map(combo => combo.id)).size !== combos.length) throw new Error("Paginação administrativa não suportada: IDs repetidos");
       if (page.total === undefined || combos.length >= page.total) return combos;
       if (page.combos.length !== 100) throw new Error("Paginação administrativa não suportada; inventário incompleto");
     }
@@ -58,8 +78,10 @@ export class ComboClient {
 
   private normalize(value: unknown): Combo {
     const raw = z.record(z.string(), z.unknown()).parse(value);
-    return comboSchema.parse({ ...raw, strategy: this.config.adapter === "9router" ? "backend-default" : raw.strategy,
-      revision: createHash("sha256").update(JSON.stringify(raw)).digest("hex") });
+    const combo = comboSchema.parse({ ...raw, strategy: this.config.adapter === "9router" ? "backend-default" : raw.strategy,
+      revision: "canonical-v1:" + hash(canonical(raw)) });
+    originals.set(combo, raw);
+    return combo;
   }
 
   private async request(method: string, path: string, body?: unknown) {

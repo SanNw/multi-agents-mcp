@@ -9,12 +9,13 @@ test("exporta somente allowlist, bloqueia segredos e nao sobrescreve staging", a
   const temporary = await mkdtemp(join(tmpdir(), "router-release-")); const root = join(temporary, "source");
   try {
     const files = ["package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".env.example", "README.md", "LICENSE", "SECURITY.md",
-      "docs/WORKFLOWS.md", "docs/PROVIDERS.md", "docs/COMBOS.md", "docs/SECURITY_ASSESSMENT.md", ".github/workflows/ci.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "scripts/package.test.mjs", "src/example.ts", "config/agents.example.yaml", "config/providers.example.yaml", ".env", ".jobs/private.json", ".combos/private.json"];
+      "docs/WORKFLOWS.md", "docs/PROVIDERS.md", "docs/COMBOS.md", "docs/OPERATIONS.md", "docs/RELEASING.md", "docs/TASKS-COMPATIBILITY.md", "docs/SECURITY_ASSESSMENT.md", ".github/workflows/ci.yml", ".github/workflows/publish.yml", "scripts/prepare-release.mjs", "scripts/prepare-release.test.mjs", "scripts/package.test.mjs", "scripts/publish-workflow.test.mjs", "scripts/benchmark-history.mjs", "src/example.ts", "config/agents.example.yaml", "config/providers.example.yaml", ".env", ".jobs/private.json", ".combos/private.json"];
     for (const file of files) { await mkdir(dirname(join(root, file)), { recursive: true }); await writeFile(join(root, file), "fixture"); }
     await writeFile(join(root, "package.json"), JSON.stringify({ version: "0.4.1" }));
     const destination = join(temporary, "public");
     const manifest = await prepareRelease(root, destination);
     assert.ok(manifest.some(file => file.path === "src/example.ts"));
+    for (const name of ["docs/OPERATIONS.md", "docs/RELEASING.md", "docs/TASKS-COMPATIBILITY.md", ".github/workflows/publish.yml", "scripts/publish-workflow.test.mjs", "scripts/benchmark-history.mjs"]) assert.ok(manifest.some(file => file.path === name), name);
     await assert.rejects(readFile(join(destination, ".env")));
     await assert.rejects(readFile(join(destination, ".jobs/private.json")));
     await assert.rejects(readFile(join(destination, ".combos/private.json")));

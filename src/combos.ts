@@ -4,9 +4,10 @@ import { lstat, mkdir, open, readdir, rename, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
 import type { Agent } from "./agents.js";
-import { comboSchema, consumerReferences, memberModels, usesRoute, type Combo, type ComboDefinition } from "./combo-client.js";
+import { comboSchema, consumerReferences, memberModels, sameRevision, usesRoute, type Combo, type ComboDefinition } from "./combo-client.js";
 import { serializeError } from "./errors.js";
 import type { ProviderRegistry } from "./providers.js";
+import { probeCases, probeSuiteNames, type ProbeSuite } from "./combo-probes.js";
 
 const uuid = z.string().uuid();
 export const comboPlanInput = z.object({
@@ -40,7 +41,7 @@ export class ComboManager {
     if (project) this.policy(provider, project);
     const [combos, plans, consumers] = await Promise.all([client.list(), this.plans(), consumerReferences(client.config)]);
     return { combos: combos.map(combo => {
-      const owner = plans.find(plan => plan.provider === provider && plan.status === "applied" && plan.result?.id === combo.id && digest(plan.result) === digest(combo));
+      const owner = plans.find(plan => plan.provider === provider && plan.status === "applied" && plan.result && sameRevision(plan.result, combo));
       const users = [...new Set(consumers.references.filter(reference => usesRoute(reference.route, combo.name)).map(reference => reference.consumer))];
       return { ...combo, project_id: owner?.project_id ?? null, managed: Boolean(owner),
         protected: !owner || users.length > 0 || client.config.protected_routes.some(route => usesRoute(route, combo.name)), consumers: users };
@@ -77,7 +78,7 @@ export class ComboManager {
       const combos = await client.list();
       if (plan.status === "applied") {
         const current = combos.find(combo => combo.id === plan.result?.id);
-        if (!current || !same(current, plan.definition)) throw new Error("Combo alterado externamente ou removido");
+        if (!current || !plan.result || !sameRevision(plan.result, current)) throw new Error("Combo alterado externamente ou removido");
         return plan;
       }
       if (["applying", "uncertain"].includes(plan.status)) {
@@ -87,7 +88,7 @@ export class ComboManager {
       }
       if (plan.source) {
         const current = await this.owned(plan.provider, plan.project_id, plan.source.id, combos);
-        if (digest(current) !== digest(plan.source)) throw new Error("Origem mudou desde o planejamento");
+        if (!sameRevision(plan.source, current)) throw new Error("Origem mudou desde o planejamento");
       }
       await this.validateDestination(plan, combos);
       const owned = (await this.plans()).filter(candidate => candidate.provider === plan.provider && candidate.project_id === plan.project_id && candidate.status === "applied");
@@ -110,10 +111,11 @@ export class ComboManager {
     const provider = agent.provider ?? "default";
     this.policy(provider, project);
     const combo = await this.owned(provider, project, comboId, await this.providers.management(provider).list());
-    return { ...agent, route: combo.name, fallback_routes: [], route_strategy: "fallback" };
+    return { ...agent, project_id: project, route: combo.name, fallback_routes: [], route_strategy: "fallback" };
   }
 
-  async testCombo(provider: string, project: string, id: string, selected?: string[]) {
+  async testCombo(provider: string, project: string, id: string, selected?: string[], suite: ProbeSuite = "availability-v1") {
+    z.enum(probeSuiteNames).parse(suite);
     const { client, policy } = this.policy(provider, project);
     if (!policy.allow_tests) throw new Error("Testes não autorizados pela política de combos");
     const combo = (await client.list()).find(candidate => candidate.id === id);
@@ -128,20 +130,32 @@ export class ComboManager {
     if (models.some(model => !catalog.has(model) || comboNames.has(model))) throw new Error("Modelo não está no catálogo ou referencia outro combo");
     const results = [];
     for (const model of models) {
+      for (const sample of probeCases(suite)) {
       const started = Date.now();
-      const agent: Agent = { id: "combo-probe", provider, route: model, role: "probe", description: "Bounded model availability probe",
+      const agent: Agent = { id: "combo-probe", provider, project_id: project, route: model, role: "probe", description: "Bounded synthetic model probe",
         fallback_routes: [], route_strategy: "fallback", temperature: 0, timeout_ms: 20000,
         first_byte_timeout_ms: 15000, idle_timeout_ms: 15000, max_output_tokens: 64, retries: 0, concurrency: 1, stream: false };
       try {
-        const response = await this.providers.delegate(agent, "Reply exactly: OK", undefined, undefined, "Plain text", {
-          timeoutMs: 20000, firstByteTimeoutMs: 15000, maxOutputTokens: 64, retries: 0, expectedText: "OK", minOutputChars: 2 });
-        results.push({ model, status: response.status, elapsed_ms: Date.now() - started, response: response.content.slice(0, 500),
+        const response = await this.providers.delegate(agent, sample.prompt, undefined, undefined, "Plain text", {
+          timeoutMs: 20000, firstByteTimeoutMs: 15000, maxOutputTokens: 64, retries: 0, expectedText: sample.expected, minOutputChars: 1 });
+        results.push({ model, case_id: sample.id, passed: response.status === "success" && sample.check(response.content), status: response.status, elapsed_ms: Date.now() - started, response: response.content.slice(0, 500),
           effective_model: response.effective_model, usage: response.usage, reported_model_matches_request: response.effective_model === model });
       } catch (error) {
-        results.push({ model, status: "error", elapsed_ms: Date.now() - started, error: serializeError(error) });
+        results.push({ model, case_id: sample.id, passed: false, status: "error", elapsed_ms: Date.now() - started, error: serializeError(error) });
+      }
       }
     }
-    return { combo_id: id, results, mutates_combo: false, retries: 0, max_output_tokens_per_model: 64, quality_evaluation: false };
+    const report = { report_id: randomUUID(), created_at: new Date().toISOString(), combo_id: id, provider, project_id: project, suite, results,
+      samples_per_model: probeCases(suite).length, variability: "not_measured", physical_model_identity: "unknown", mutates_combo: false, retries: 0,
+      max_output_tokens_per_request: 64, max_output_tokens_per_model: 64 * probeCases(suite).length, quality_evaluation: false };
+    await this.init();
+    const directory = resolve(this.directory, "reports");
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    const info = await lstat(directory);
+    if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o077)) throw new Error("Diretório de relatórios deve ser privado e sem symlink");
+    const file = await open(resolve(directory, report.report_id + ".json"), "wx", 0o600);
+    try { await file.writeFile(JSON.stringify(report)); await file.sync(); } finally { await file.close(); }
+    return report;
   }
 
   private validateModels(models: string[], allowed: string[]) {
@@ -161,7 +175,7 @@ export class ComboManager {
   private async owned(provider: string, project: string, id: string, combos: Combo[]) {
     const owner = (await this.plans()).find(plan => plan.provider === provider && plan.project_id === project && plan.status === "applied" && plan.result?.id === id);
     const combo = combos.find(candidate => candidate.id === id);
-    if (!owner || !combo || digest(combo) !== digest(owner.result)) throw new Error("Combo externo, protegido, alterado ou pertencente a outro projeto");
+    if (!owner?.result || !combo || !sameRevision(owner.result, combo)) throw new Error("Combo externo, protegido, alterado ou pertencente a outro projeto");
     return combo;
   }
 

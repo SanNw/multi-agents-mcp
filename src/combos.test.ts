@@ -11,6 +11,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { resolve } from "node:path";
 import { JobManager } from "./jobs.js";
+import { createHash } from "node:crypto";
+import { probeCases } from "./combo-probes.js";
 
 async function fixture(adapter: "omniroute" | "9router" = "omniroute") {
   const root = await mkdtemp(join(tmpdir(), "multiagents-combos-"));
@@ -56,6 +58,64 @@ async function fixture(adapter: "omniroute" | "9router" = "omniroute") {
   return { ...loaded, root, profile, load, combos, requests, loseResponse: () => { uncertain = true; },
     close: async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(root, { recursive: true, force: true }); } };
 }
+
+test("canonical revisions ignore key order but retain all backend configuration", async () => {
+  const setup = await fixture();
+  try {
+    const plan = await setup.manager.plan({ provider: "fixture", project_id: "project", name: "stable", models: ["model-a"] });
+    const applied = await setup.manager.apply(plan.id);
+    const index = setup.combos.findIndex(combo => combo.id === applied.result!.id);
+    const original = setup.combos[index]!;
+    setup.combos[index] = { strategy: original.strategy, models: original.models, name: original.name, id: original.id };
+    assert.equal((await setup.manager.list("fixture")).combos.find(combo => combo.id === original.id)!.managed, true);
+    Object.assign(setup.combos[index]!, { timeout: 12 });
+    await assert.rejects(setup.manager.resolveAgent({ provider: "fixture" } as never, "project", original.id), /alterado/);
+    await assert.rejects(setup.manager.apply(plan.id), /alterado/);
+  } finally { await setup.close(); }
+});
+
+test("legacy ownership remains usable without rewriting its ledger", async () => {
+  const setup = await fixture();
+  try {
+    const plan = await setup.manager.plan({ provider: "fixture", project_id: "project", name: "legacy", models: ["model-a"] });
+    const applied = await setup.manager.apply(plan.id);
+    const raw = setup.combos.find(combo => combo.id === applied.result!.id)!;
+    applied.result!.revision = createHash("sha256").update(JSON.stringify(raw)).digest("hex");
+    const path = join(setup.root, "state", plan.id + ".json");
+    const saved = JSON.stringify(applied);
+    await writeFile(path, saved);
+    assert.equal((await setup.manager.list("fixture")).combos.find(combo => combo.id === raw.id)!.managed, true);
+    assert.equal((await setup.manager.resolveAgent({ provider: "fixture" } as never, "project", raw.id)).route, raw.name);
+    assert.equal(await readFile(path, "utf8"), saved);
+    const index = setup.combos.indexOf(raw);
+    setup.combos[index] = { strategy: raw.strategy, models: raw.models, name: raw.name, id: raw.id };
+    assert.equal((await setup.manager.list("fixture")).combos.find(combo => combo.id === raw.id)!.managed, true);
+    assert.equal(await readFile(path, "utf8"), saved);
+    setup.combos[index] = raw;
+    Object.assign(raw, { routing: "changed" });
+    await assert.rejects(setup.manager.resolveAgent({ provider: "fixture" } as never, "project", raw.id), /alterado/);
+  } finally { await setup.close(); }
+});
+
+test("synthetic suites check deterministic cases and persist private isolated reports", async () => {
+  assert.equal(probeCases("json-v1")[0]!.check('{"count":3}'), true);
+  assert.equal(probeCases("json-v1")[0]!.check('{"count":3,"extra":true}'), false);
+  assert.equal(probeCases("json-v1")[0]!.check('```json\n{"count":3}\n```'), false);
+  assert.equal(probeCases("instructions-v1")[0]!.check("green blue red"), true);
+  const setup = await fixture();
+  try {
+    const report = await setup.manager.testCombo("fixture", "project", "external", ["model-a"], "instructions-v1");
+    assert.equal(report.samples_per_model, 2);
+    assert.equal(report.results.length, 2);
+    assert(report.results.every(result => !result.passed));
+    assert.equal(report.quality_evaluation, false);
+    const path = join(setup.root, "state", "reports", report.report_id + ".json");
+    assert.equal((await stat(path)).mode & 0o777, 0o600);
+    assert.equal(JSON.parse(await readFile(path, "utf8")).suite, "instructions-v1");
+    assert.equal((await setup.manager.list("fixture")).combos[0]!.managed, false);
+    await assert.rejects(setup.manager.testCombo("fixture", "project", "external", ["model-a"], "tools-v1" as never));
+  } finally { await setup.close(); }
+});
 
 test("external CLI routes are visible, protected, and never changed", async () => {
   const setup = await fixture();

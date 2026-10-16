@@ -51,7 +51,9 @@ No tool edits agents.yaml, CLI primary/small models, global aliases, or backend 
 
 Apply uses an exclusive interprocess file lock. A surviving lock after a crash requires operator recovery: inspect the exact lock and running consumers before removal. A timed-out POST becomes uncertain; reapplication reconciles by unique name and expected definition without another POST. Missing/conflicting results stop reconciliation. Successful reapplication verifies and returns the existing result.
 
-State defaults to `.combos` beside job state. Set `MULTIAGENTS_COMBOS_DIR` to a private absolute directory for stable installations. The directory requires mode 0700; files use 0600. Preserve state for ownership and recovery. Previous versions remain and count against project limits; cleanup is a separate operator decision.
+State defaults to `.combos` beside job state. Set `MULTIAGENTS_COMBOS_DIR` to a private absolute directory for stable installations. The directory requires mode 0700; files use 0600. Preserve state for ownership and recovery. Previous versions remain and count against project limits; cleanup is a separate operator decision. Linux/WSL is the confirmed private-state scope; POSIX mode checks do not certify native Windows ACL privacy.
+
+Revisions now use `canonical-v1:` with recursively ordered keys and all raw backend fields. Property order does not cause conflicts, while configuration changes do. No timestamp is excluded without backend evidence establishing volatility. Legacy 0.5.0 raw hashes remain accepted when the original raw hash matches or its complete fields can be reconstructed exactly. Unknown legacy fields/order that cannot be reconstructed fail closed; they are not silently adopted. Reading legacy records does not rewrite the ledger.
 
 ## Individual member probes
 
@@ -61,15 +63,28 @@ State defaults to `.combos` beside job state. Set `MULTIAGENTS_COMBOS_DIR` to a 
 
 Pass this to `test_combo`. Omit `models` to test all distinct members within `max_test_models`; explicit subsets must belong to the combo. Every ID must be allowed by project policy and present in the configured/remote catalog. External combos can be tested without adoption or modification.
 
-The probe sends a fixed `Reply exactly: OK` prompt to each model directly and sequentially: zero MCP retries/fallbacks, 20-second request limit, at most 64 output tokens per member. It reports success/degraded/error, response, latency, reported effective model, and usage when supplied. A failing member does not prevent testing subsequent selected members. Project source and arbitrary user prompts are never sent by this tool.
+The default `availability-v1` probe sends a fixed `Reply exactly: OK` prompt to each model directly and sequentially: zero MCP retries/fallbacks, 20-second request limit, at most 64 output tokens per request. Optional `suite` values select versioned synthetic cases:
 
-Requests consume quota and may cost money. Limits are per invocation, not a daily or monetary budget. `allow_tests` is false by default. Backend aliases/account fallback may still apply; `reported_model_matches_request` compares identifiers, not physical identity. This is an availability/control-prompt test, not a benchmark of reasoning, tools, multimodal support, or individual account connections.
+| Suite | Cases per model | Deterministic check |
+| --- | --- | --- |
+| `availability-v1` | 1 | Exact `OK` response. |
+| `text-v1` | 1 | Exact requested literal. |
+| `json-v1` | 1 | Parse JSON and verify the exact property/value. |
+| `instructions-v1` | 2 | Ordered output and a constrained numeric answer. |
+
+These suites test textual responses; JSON mode/native structured-output support is not implied. Tool-calling cases are deferred because no trusted backend capability declaration is implemented. Each result reports its case, deterministic pass/fail, success/degraded/error status, response, latency, reported model, and usage when supplied. A failing case does not stop subsequent cases. Reports include suite version, timestamp, sample count and explicit unknown variability/physical model identity; they make no general quality guarantee. Project source and arbitrary user prompts are never sent.
+
+Private reports are stored in the `reports/` subdirectory, isolated from the ownership plan ledger. Reports never trigger combo changes. Preserve them as evidence; publication excludes private runtime directories.
+
+Requests consume quota and may cost money. `max_test_models` and the allowlist remain enforced for every suite; `instructions-v1` uses up to 128 output tokens across two requests per model. `allow_tests` is false by default. Optional provider `limits` add shared attempt/request/token reservations across cooperating processes; without them only per-call probe bounds apply. These are not monetary budgets. See [operations](OPERATIONS.md). Backend aliases/account fallback may still apply; `reported_model_matches_request` compares identifiers, not physical identity. One synthetic run does not measure model variability or general reasoning, tool, multimodal, or account quality.
 
 ## Português
 
 Habilite a gestão somente no arquivo privado do usuário. `consumers` identifica rotas de outras CLIs sem expor seus arquivos completos; todos os combos externos ficam protegidos. Atualizações criam uma nova versão sem sobrescrever o combo anterior ou alterar configurações de CLIs.
 
-`test_combo` testa os modelos individualmente, inclusive de combos externos. Exige permissão, IDs autorizados e limites por chamada. Os testes consomem cota e medem disponibilidade, não qualidade geral. Para usar uma nova versão, a tarefa ou etapa do workflow informa explicitamente projeto e combo.
+`test_combo` testa os modelos individualmente, inclusive de combos externos. Exige permissão, IDs autorizados e limites por chamada. Mantém `availability-v1` como padrão e oferece `text-v1`, `json-v1` e `instructions-v1`; cada caso usa até 64 tokens e 20 segundos, sem repetição ou fallback pelo MCP. A suíte de instruções executa dois casos por modelo. Relatórios privados ficam em `reports/`, fora do ledger de propriedade, e não alteram combos automaticamente. Os resultados sintéticos não garantem qualidade geral nem medem variabilidade. Testes de ferramentas permanecem adiados por falta de declaração confiável de capacidade.
+
+Revisões `canonical-v1` preservam todos os campos relevantes recebidos e ignoram somente a ordem das propriedades. Estado 0.5.0 continua utilizável quando o hash original confere ou é reconstruível com segurança; registros não são regravados em massa. Configuração desconhecida ou alterada impede adoção. Para usar uma versão, informe projeto e combo juntos. Orçamentos compartilhados são opcionais e precisam estar configurados no provider; veja [operação e recuperação](OPERATIONS.md).
 
 ## Upstream contracts
 
