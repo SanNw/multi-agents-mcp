@@ -291,3 +291,9 @@ Mantenha prompts, estado e credenciais fora de repositórios públicos. O servid
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+
+-----
+
+[![M8ven Score](https://m8ven.ai/badge/mcp/sannw-multi-agents-mcp-2wdv7s?v=7d55af2c66877e454ad1c98eab8094cc)](https://m8ven.ai/mcp/sannw-multi-agents-mcp-2wdv7s?s=readme)
+[![M8ven Score](https://m8ven.ai/badge/mcp/sannw-multi-agents-mcp-2wdv7s?v=7d55af2c66877e454ad1c98eab8094cc)](https://m8ven.ai/mcp/sannw-multi-agents-mcp-2wdv7s?s=readme)
